@@ -5,6 +5,8 @@ x64/
 x86/
 [Bb]in/
 [Oo]bj/
+**/bin\\Debug/
+**/obj\\Debug/
 
 # Visual Studio
 .vs/
