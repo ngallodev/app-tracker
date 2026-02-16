@@ -13,13 +13,20 @@ namespace Tracker.Api.Endpoints;
 
 public static class AnalysesEndpoints
 {
+    private const string DeterministicMode = "deterministic";
+    private const string LlmFallbackMode = "llm_fallback";
+
     private static AnalysisResultDto ToDto(Analysis analysis)
     {
+        var (gapMode, usedLlmFallback) = ResolveGapAnalysisMode(analysis);
+
         return new AnalysisResultDto(
             analysis.Id,
             analysis.JobId,
             analysis.ResumeId,
             analysis.Status.ToString(),
+            gapMode,
+            usedLlmFallback,
             analysis.Result?.CoverageScore ?? 0,
             analysis.Result?.GroundednessScore ?? 0,
             analysis.Result?.RequiredSkillsJson,
@@ -32,6 +39,45 @@ public static class AnalysesEndpoints
         );
     }
 
+    private static AnalysisResultDto ToDto(Analysis analysis, string gapMode, bool usedLlmFallback)
+    {
+        return new AnalysisResultDto(
+            analysis.Id,
+            analysis.JobId,
+            analysis.ResumeId,
+            analysis.Status.ToString(),
+            gapMode,
+            usedLlmFallback,
+            analysis.Result?.CoverageScore ?? 0,
+            analysis.Result?.GroundednessScore ?? 0,
+            analysis.Result?.RequiredSkillsJson,
+            analysis.Result?.MissingRequiredJson,
+            analysis.Result?.MissingPreferredJson,
+            analysis.InputTokens,
+            analysis.OutputTokens,
+            analysis.LatencyMs,
+            analysis.CreatedAt
+        );
+    }
+
+    private static (string gapMode, bool usedLlmFallback) ResolveGapAnalysisMode(Analysis analysis)
+    {
+        var logs = analysis.Logs;
+        if (logs is null || logs.Count == 0)
+        {
+            return ("unknown", false);
+        }
+
+        var usedFallback = logs.Any(l => l.StepName == "gap_analysis_llm_fallback");
+        if (usedFallback)
+        {
+            return (LlmFallbackMode, true);
+        }
+
+        var deterministic = logs.Any(l => l.StepName == "gap_analysis_deterministic");
+        return (deterministic ? DeterministicMode : "unknown", false);
+    }
+
     public static IEndpointRouteBuilder MapAnalysisEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/analyses");
@@ -42,6 +88,7 @@ public static class AnalysesEndpoints
             var analyses = await db.Analyses
                 .AsNoTracking()
                 .Include(a => a.Result)
+                .Include(a => a.Logs)
                 .ToListAsync(ct);
             
             var result = analyses
@@ -60,6 +107,7 @@ public static class AnalysesEndpoints
                 .Include(a => a.Result)
                 .Include(a => a.Job)
                 .Include(a => a.Resume)
+                .Include(a => a.Logs)
                 .FirstOrDefaultAsync(a => a.Id == id, ct);
             
             if (analysis is null)
@@ -136,6 +184,7 @@ public static class AnalysesEndpoints
                 .Include(a => a.Result)
                 .Include(a => a.Job)
                 .Include(a => a.Resume)
+                .Include(a => a.Logs)
                 .Where(a =>
                     a.Status == AnalysisStatus.Completed &&
                     a.Result != null &&
@@ -207,7 +256,9 @@ public static class AnalysesEndpoints
                 {
                     Id = Guid.NewGuid(),
                     AnalysisId = analysis.Id,
-                    StepName = "gap_analysis",
+                    StepName = result.Metadata.UsedGapLlmFallback
+                        ? "gap_analysis_llm_fallback"
+                        : "gap_analysis_deterministic",
                     RawResponse = result.Metadata.GapRawResponse,
                     ParseSuccess = result.Metadata.GapParseSuccess,
                     RepairAttempted = result.Metadata.GapRepairAttempted,
@@ -216,7 +267,9 @@ public static class AnalysesEndpoints
                 
                 await db.SaveChangesAsync(ct);
                 
-                return Results.Created($"/api/analyses/{analysis.Id}", ToDto(analysis));
+                return Results.Created(
+                    $"/api/analyses/{analysis.Id}",
+                    ToDto(analysis, result.Metadata.GapAnalysisMode, result.Metadata.UsedGapLlmFallback));
             }
             catch (Exception ex)
             {
