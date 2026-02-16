@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Tracker.AI;
@@ -113,28 +114,13 @@ public static class AnalysesEndpoints
             if (analysis is null)
                 return Results.NotFound();
             
-            // Parse JSON for detailed view
-            List<SkillMatchDto>? matches = null;
-            List<SkillDto>? missingRequired = null;
-            List<SkillDto>? missingPreferred = null;
-            
-            if (analysis.Result is not null)
-            {
-                try
-                {
-                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                    // Would need actual GapAnalysis model to parse properly
-                    // For now, return raw JSON strings
-                }
-                catch { /* ignore parse errors */ }
-            }
-            
             return Results.Ok(ToDto(analysis));
         })
         .WithName("GetAnalysisById");
         
-        // POST /api/analyses
-        group.MapPost("/", async (
+        group.MapPost("/", [
+            EnableRateLimiting("StrictAnalysisPolicy")
+        ] async (
             CreateAnalysisRequest request,
             TrackerDbContext db,
             IAnalysisService analysisService,
