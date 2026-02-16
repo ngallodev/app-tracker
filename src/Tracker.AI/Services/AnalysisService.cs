@@ -120,8 +120,25 @@ public class AnalysisService : IAnalysisService
             LatencyMs = (int)deterministicSw.ElapsedMilliseconds,
             ParseSuccess = true,
             RepairAttempted = false,
-            RawResponse = "deterministic_local_matcher"
+            RawResponse = JsonSerializer.Serialize(deterministicGap)
         };
+
+        if (ShouldFallbackToLlmGapAnalysis(jdResult.Value, deterministicGap))
+        {
+            _logger.LogInformation("Deterministic matcher confidence low. Running LLM fallback for gap analysis.");
+            var jdJson = JsonSerializer.Serialize(jdResult.Value, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            });
+
+            gapResult = await _llmClient.CompleteStructuredAsync<GapAnalysis>(
+                GapAnalysisPrompt.SystemPrompt,
+                GapAnalysisPrompt.UserPrompt(jdJson, resumeText),
+                cancellationToken);
+
+            totalInputTokens += gapResult.Usage.InputTokens;
+            totalOutputTokens += gapResult.Usage.OutputTokens;
+        }
         
         sw.Stop();
         
@@ -316,5 +333,23 @@ public class AnalysisService : IAnalysisService
     private static string NormalizeSkillToken(string skill)
     {
         return NormalizeText(skill);
+    }
+
+    private static bool ShouldFallbackToLlmGapAnalysis(JdExtraction jd, GapAnalysis deterministicGap)
+    {
+        var totalRequired = jd.RequiredSkills.Count;
+        if (totalRequired == 0)
+        {
+            return false;
+        }
+
+        var matchedRequired = deterministicGap.Matches.Count(m => m.IsRequired);
+        if (matchedRequired == 0 && totalRequired >= 2)
+        {
+            return true;
+        }
+
+        var coverageRatio = (decimal)matchedRequired / totalRequired;
+        return totalRequired >= 5 && coverageRatio < 0.25m;
     }
 }
