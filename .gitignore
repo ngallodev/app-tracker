@@ -38,6 +38,8 @@ appsettings.Development.json
 # Logs
 logs/
 *.log
+.dev-report-cache.md
+.dev-report-cahe.md
 
 # OS files
 .DS_Store
