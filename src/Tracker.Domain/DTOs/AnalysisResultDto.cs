@@ -5,6 +5,8 @@ public record AnalysisResultDto(
     Guid JobId,
     Guid ResumeId,
     string Status,
+    string GapAnalysisMode,
+    bool UsedGapLlmFallback,
     decimal CoverageScore,
     decimal GroundednessScore,
     string? RequiredSkillsJson,

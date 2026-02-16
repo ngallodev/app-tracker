@@ -427,6 +427,26 @@ Set OPENAI_API_KEY environment variable to enable real LLM calls.
 
 ---
 
+## Optimized Execution Workflow (Remaining Days Only)
+
+These optimized breakdowns are intended for efficient multi-agent assignment and lower token/cost overhead:
+
+- Day 3 optimized breakdown: `docs/day-3-tasks.md` (see "Day 3 Optimization Addendum")
+- Day 4 optimized breakdown: `docs/day-4-tasks.md`
+- Day 5 optimized breakdown: `docs/day-5-tasks.md` (see "Day 5 Optimization Addendum")
+
+### Agent and model guidance
+- `explorer` agent: discovery, code search, validation checks, docs consistency checks.  
+  Model suggestion: Small/mini tier.
+- `worker` agent: implementation tasks touching multiple files/contracts.  
+  Model suggestion: Medium tier.
+- Use higher-cost model tiers only for complex cross-cutting refactors or ambiguous architecture decisions.
+
+### Skill guidance
+- Use `exec-statusline-json` when execution telemetry (quota/tokens/footer data) needs to be captured for evidence or audit logs.
+
+---
+
 # Success Criteria (Overall MVP)
 
 - [ ] End-to-end flow < 30 seconds (paste JD → see analysis)

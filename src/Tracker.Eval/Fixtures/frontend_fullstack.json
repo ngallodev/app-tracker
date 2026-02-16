@@ -1,0 +1,35 @@
+{
+  "name": "frontend_fullstack",
+  "roleTitle": "Frontend Fullstack Engineer",
+  "seniorityLevel": "mid",
+  "requiredSkills": [
+    {
+      "skillName": "JavaScript",
+      "evidenceQuote": "Excellent JavaScript fundamentals",
+      "category": "technical"
+    },
+    {
+      "skillName": "TypeScript",
+      "evidenceQuote": "TypeScript in production applications",
+      "category": "technical"
+    },
+    {
+      "skillName": "React",
+      "evidenceQuote": "Deep experience with React",
+      "category": "framework"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "Node.js",
+      "evidenceQuote": "Node.js backend collaboration experience",
+      "category": "technical"
+    }
+  ],
+  "resumeText": "Frontend engineer shipping React interfaces. Daily TS and JS usage for product features. Partnered with backend teams and built internal Node.js tools.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 1
+  }
+}

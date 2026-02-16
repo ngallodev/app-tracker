@@ -731,3 +731,67 @@ export interface Skill {
 ---
 
 *End of Day 3 Task Breakdown*
+
+---
+
+## Day 3 Optimization Addendum (Uncompleted Scope Only)
+
+This addendum replaces the remaining Day 3 execution order with a lower-cost, multi-agent-friendly workflow.
+
+### Remaining outcomes (only)
+- Ship a minimal `web/` frontend for Jobs, Resumes, and Analysis.
+- Expose analysis mode metadata in API (`deterministic` vs `llm_fallback`).
+- Run deterministic fixture evals with near-zero AI usage.
+
+### Agent + model assignment matrix
+
+| Lane | Scope | Agent Type | Model Tier Suggestion | Skills |
+|------|-------|------------|------------------------|--------|
+| A | Backend API completion (`/api/analyses` metadata, DTO alignment) | `worker` | Medium | None required |
+| B | Deterministic eval harness (`Tracker.Eval`, fixtures, runner script) | `worker` | Small/Medium | None required |
+| C | Frontend scaffold + pages (`web/`) | `worker` | Medium | None required |
+| D | Rapid codebase discovery, file targeting, dependency checks | `explorer` | Small | `exec-statusline-json` when collecting exec telemetry |
+| E | Integration QA, checklist pass/fail verification | `explorer` + `worker` | Small for checks, Medium for fixes | `exec-statusline-json` optional |
+
+### Optimized sequence
+1. Lane D: verify existing backend contracts and produce exact DTO/API map.
+2. Lane A: finish backend metadata and endpoint behavior first (blocks UI/API alignment risk).
+3. Lane B in parallel: complete deterministic eval runner and 3-5 fixtures.
+4. Lane C: build frontend against finalized DTOs.
+5. Lane E: run regression checks and acceptance checklist.
+
+### Detailed task packs for delegation
+
+#### Pack A1: Analysis API metadata completion
+- Files: `src/Tracker.Domain/DTOs/AnalysisResultDto.cs`, `src/Tracker.Api/Endpoints/AnalysesEndpoints.cs`, `src/Tracker.AI/Services/AnalysisService.cs`
+- Deliverables:
+  - Response includes `gapAnalysisMode` and `usedGapLlmFallback`.
+  - Cached and newly created analyses return the same metadata contract.
+  - LLM logs preserve step-level mode evidence.
+- Acceptance:
+  - New analyses with deterministic path show `gapAnalysisMode=deterministic`.
+  - Low-confidence path shows `gapAnalysisMode=llm_fallback`.
+
+#### Pack B1: Deterministic eval runner
+- Files: `src/Tracker.Eval/Program.cs`, `src/Tracker.Eval/Fixtures/*.json`, `scripts/run_deterministic_eval.sh`
+- Deliverables:
+  - Fixture-driven pass/fail output with non-zero exit on failure.
+  - No API key required.
+- Acceptance:
+  - Runner executes all fixtures.
+  - Summary includes fixture count, pass count, fail count.
+
+#### Pack C1: MVP frontend only (no extras)
+- Files: `web/src/pages/{Jobs,Resumes,Analysis}Page.tsx`, `web/src/lib/api.ts`
+- Deliverables:
+  - Jobs + resumes CRUD list views.
+  - Analysis trigger and result view including mode metadata.
+- Acceptance:
+  - End-to-end path works from job + resume creation to analysis display.
+
+### Token and cost controls for Day 3
+- Use deterministic eval as default QA signal.
+- Reserve model calls for:
+  - JD extraction
+  - deterministic low-confidence fallback only
+- Keep frontend prompts/data requests to required fields only.
