@@ -927,3 +927,63 @@ fly apps restart job-tracker
 ---
 
 *Day 5 task breakdown complete. Dependencies: Day 4 reliability patterns must be in place before deployment.*
+
+---
+
+## Day 5 Optimization Addendum (Uncompleted Scope Only)
+
+This addendum narrows Day 5 to the highest-value remaining outputs and makes delegation predictable.
+
+### Remaining outcomes (only)
+- Deploy one stable environment with persistent SQLite.
+- Produce one concise, accurate README tied to implemented behavior.
+- Prepare one deterministic demo path with fallback screenshots.
+
+### Agent + model assignment matrix
+
+| Lane | Scope | Agent Type | Model Tier Suggestion | Skills |
+|------|-------|------------|------------------------|--------|
+| A | Containerization + deploy config hardening | `worker` | Medium | None required |
+| B | README + architecture docs + portfolio summary | `worker` | Small/Medium | None required |
+| C | Demo script + pre-demo checklist + seeded data script | `worker` | Small | None required |
+| D | Validation (health, endpoint checks, smoke scripts) | `explorer` | Small | `exec-statusline-json` for command telemetry evidence |
+
+### Optimized sequence
+1. Lane A first: lock Docker/deployment correctness.
+2. Lane D smoke checks immediately after deploy.
+3. Lane B and C in parallel once deployment URL is stable.
+4. Final pass: reconcile README claims against live behavior only.
+
+### Detailed task packs for delegation
+
+#### Pack A1: Minimal deploy hardening
+- Deliverables:
+  - One deploy target selected (Fly.io or Railway), not both.
+  - Persistent volume configured and verified.
+  - Runtime env var contract documented.
+- Acceptance:
+  - `/healthz` and `/version` return 200 on live URL.
+  - Data survives restart/redeploy.
+
+#### Pack B1: Documentation truth pass
+- Deliverables:
+  - README reflects actual implemented features only.
+  - Clear note of deterministic-first matching and LLM fallback behavior.
+  - Deterministic eval command included.
+- Acceptance:
+  - Fresh setup instructions are reproducible without hidden steps.
+  - No claims of missing features (queueing, dashboards) as complete.
+
+#### Pack C1: Demo and interview package
+- Deliverables:
+  - 60-second script aligned to live system.
+  - Pre-demo checklist with fallback assets.
+  - Seed script/data for consistent demo state.
+- Acceptance:
+  - Demo run is reproducible in one pass.
+  - Fallback flow works if external API is unavailable.
+
+### Token and cost controls for Day 5
+- Prefer deterministic sample analyses for demo whenever possible.
+- If live LLM call is needed, run one call only and show cached rerun.
+- Capture exact command evidence once and reuse in docs.

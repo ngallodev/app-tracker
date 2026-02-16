@@ -1,0 +1,40 @@
+{
+  "name": "backend_api_engineer",
+  "roleTitle": "Backend API Engineer",
+  "seniorityLevel": "mid",
+  "requiredSkills": [
+    {
+      "skillName": "C#",
+      "evidenceQuote": "Strong C#/.NET development required",
+      "category": "technical"
+    },
+    {
+      "skillName": "SQL",
+      "evidenceQuote": "Hands-on SQL and data modeling experience",
+      "category": "technical"
+    },
+    {
+      "skillName": "Docker",
+      "evidenceQuote": "Experience containerizing services with Docker",
+      "category": "tool"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "Kubernetes",
+      "evidenceQuote": "Kubernetes exposure is a plus",
+      "category": "tool"
+    },
+    {
+      "skillName": "AWS",
+      "evidenceQuote": "Familiarity with AWS services preferred",
+      "category": "cloud"
+    }
+  ],
+  "resumeText": "Backend engineer using C# and .NET APIs with SQL Server and PostgreSQL. Deployed services with Docker and CI pipelines. Built workloads on AWS ECS.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 1
+  }
+}
