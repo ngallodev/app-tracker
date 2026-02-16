@@ -1518,3 +1518,84 @@ Day 3 Complete
 ---
 
 *End of Day 4 Task Breakdown*
+
+---
+
+## Day 4 Optimization Addendum (Uncompleted Scope Only)
+
+This addendum narrows Day 4 to the highest-value reliability outcomes and makes delegation predictable.
+
+### Remaining outcomes (only)
+- Add resilient LLM call behavior (retry, timeout, circuit breaker) with observable failure states.
+- Standardize request tracing and error contracts (correlation ID + ProblemDetails).
+- Add minimal but effective security and readiness checks (rate limit + health probes).
+
+### Agent + model assignment matrix
+
+| Lane | Scope | Agent Type | Model Tier Suggestion | Skills |
+|------|-------|------------|------------------------|--------|
+| A | LLM resilience policies + registration wiring | `worker` | Medium | None required |
+| B | Correlation ID + structured logging baseline | `worker` | Small/Medium | None required |
+| C | Global error handling + ProblemDetails contract | `worker` | Medium | None required |
+| D | Rate limiting + input validation hardening | `worker` | Medium | None required |
+| E | Health/readiness checks + smoke verification | `explorer` + `worker` | Small for checks, Medium for fixes | `exec-statusline-json` optional for command telemetry |
+
+### Optimized sequence
+1. Lane B first: establish correlation/logging context so all later work emits traceable diagnostics.
+2. Lane A in parallel with Lane D: resilience and security can progress independently once logging context exists.
+3. Lane C after Lane B: wire global exception handling into the established observability path.
+4. Lane E final: validate `/healthz` and `/healthz/ready`, then run smoke checks for failure and rate-limit paths.
+5. Final pass: verify all middleware order and response contracts match docs.
+
+### Detailed task packs for delegation
+
+#### Pack A1: LLM resilience completion
+- Files: `src/Tracker.AI/OpenAiClient.cs`, `src/Tracker.AI/PollyPolicies.cs`, `src/Tracker.Api/Program.cs`
+- Deliverables:
+  - Retry + timeout + circuit breaker composed and registered once.
+  - Transient failures retried with structured logs per attempt.
+  - Circuit state transitions logged clearly.
+- Acceptance:
+  - Simulated transient failure path retries before final failure.
+  - Timeout path returns controlled error, not unhandled exception.
+
+#### Pack B1: Correlation + logging baseline
+- Files: `src/Tracker.Api/Middleware/CorrelationIdMiddleware.cs`, `src/Tracker.Api/Program.cs`, `src/Tracker.Api/appsettings.json`
+- Deliverables:
+  - Request correlation ID generated or propagated from header.
+  - Correlation ID included in structured logs and response headers.
+- Acceptance:
+  - Two concurrent requests are distinguishable via correlation IDs.
+  - Error logs include the same correlation ID surfaced to client.
+
+#### Pack C1: Global error contract
+- Files: `src/Tracker.Api/Middleware/ExceptionMiddleware.cs`, `src/Tracker.Api/Extensions/ProblemDetailsExtensions.cs`, `src/Tracker.Api/Program.cs`
+- Deliverables:
+  - Unhandled exceptions converted to RFC7807-compatible responses.
+  - Validation and domain errors map to deterministic status codes.
+- Acceptance:
+  - 400/404/429/500 responses all share one documented problem shape.
+  - Stack traces are suppressed in production mode responses.
+
+#### Pack D1: Security hardening minimum
+- Files: `src/Tracker.Api/Extensions/RateLimitingExtensions.cs`, `src/Tracker.Api/Middleware/InputValidationMiddleware.cs`, `src/Tracker.Api/Program.cs`
+- Deliverables:
+  - Rate limit policy applied to expensive endpoints (`/api/analyses`).
+  - Basic input sanitization and length limits enforced consistently.
+- Acceptance:
+  - Burst requests trigger `429` with `Retry-After`.
+  - Invalid payloads are rejected before expensive downstream processing.
+
+#### Pack E1: Readiness + smoke verification
+- Files: `src/Tracker.Api/Endpoints/HealthEndpoints.cs`, `scripts/day4_smoke.sh` (optional)
+- Deliverables:
+  - Liveness and readiness endpoints with degraded reporting for dependency issues.
+  - Repeatable smoke script for health, rate limit, and error shape checks.
+- Acceptance:
+  - `/healthz` returns `200` when API is alive.
+  - `/healthz/ready` reports dependency degradation without process crash.
+
+### Token and cost controls for Day 4
+- Prefer deterministic failure simulation (stubbed/transient exceptions) over repeated live LLM calls.
+- Reuse one smoke script for all regression checks instead of ad-hoc command generation.
+- Keep middleware/error payload examples minimal and schema-focused.

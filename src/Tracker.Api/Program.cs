@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using OpenAI;
 using Tracker.Api.Endpoints;
+using Tracker.Api.Extensions;
+using Tracker.Api.Middleware;
 using Tracker.AI;
 using Tracker.AI.Services;
 using Tracker.Infrastructure.Data;
@@ -9,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddOpenApi();
+builder.Services.AddAnalysisRateLimiting();
 
 // Configure SQLite
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -44,6 +47,8 @@ else
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
+app.UseInputValidation();
+app.UseRateLimiter();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
