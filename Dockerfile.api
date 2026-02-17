@@ -1,0 +1,39 @@
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
+WORKDIR /src
+
+# Copy solution and project files first for better layer caching
+COPY Tracker.slnx .
+COPY src/Tracker.Domain/Tracker.Domain.csproj src/Tracker.Domain/
+COPY src/Tracker.Infrastructure/Tracker.Infrastructure.csproj src/Tracker.Infrastructure/
+COPY src/Tracker.AI/Tracker.AI.csproj src/Tracker.AI/
+COPY src/Tracker.Api/Tracker.Api.csproj src/Tracker.Api/
+COPY src/Tracker.Eval/Tracker.Eval.csproj src/Tracker.Eval/
+
+# Restore dependencies
+RUN dotnet restore Tracker.slnx
+
+# Copy source code
+COPY src/ ./src/
+
+# Build and publish
+RUN dotnet publish src/Tracker.Api/Tracker.Api.csproj -c Release -o /app/publish --no-restore
+
+# Runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview AS runtime
+WORKDIR /app
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Create data directory for SQLite
+RUN mkdir -p /app/data
+
+# Copy published application
+COPY --from=build /app/publish .
+
+# Expose port
+EXPOSE 8080
+
+# Run the application
+ENTRYPOINT ["dotnet", "Tracker.Api.dll"]
