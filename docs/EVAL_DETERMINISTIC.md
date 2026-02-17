@@ -32,3 +32,7 @@ Each fixture includes:
 Example fixtures:
 - `src/Tracker.Eval/Fixtures/backend_api_engineer.json`
 - `src/Tracker.Eval/Fixtures/frontend_fullstack.json`
+
+---
+
+*Document created by: opencode (kimi-k2.5-free)*

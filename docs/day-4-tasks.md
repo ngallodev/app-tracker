@@ -1599,3 +1599,7 @@ This addendum narrows Day 4 to the highest-value reliability outcomes and makes 
 - Prefer deterministic failure simulation (stubbed/transient exceptions) over repeated live LLM calls.
 - Reuse one smoke script for all regression checks instead of ad-hoc command generation.
 - Keep middleware/error payload examples minimal and schema-focused.
+
+---
+
+*Document created by: opencode (kimi-k2.5-free)*

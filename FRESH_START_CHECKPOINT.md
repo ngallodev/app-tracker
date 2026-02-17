@@ -54,3 +54,7 @@ Branch: feature/deterministic-first-matching
 ## Notes
 - Local runtime verification is still partially blocked by environment/.NET SDK resolver behavior in this terminal context.
 - Deterministic-first path is now the default direction; LLM use is reduced to extraction + fallback cases.
+
+---
+
+*Checkpoint documented by: opencode (kimi-k2.5-free)*
