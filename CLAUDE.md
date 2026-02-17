@@ -31,3 +31,5 @@ Use this repository in a cost-efficient, deterministic-first way.
 
 7. Preserve this style in future work.
 - Any new feature should include a note on how it controls token usage.
+
+8. Sign all documentation, commits, and PRs with agent and model name e.g. codex gpt-5.1-mini or opencode kimi-k2.5-free.  All commits and prs should have detailed descriptions of changes and next steps.

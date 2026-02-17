@@ -33,3 +33,7 @@ curl -X POST http://localhost:5278/api/jobs/ \
 - Removes page chrome/noise before analysis.
 - Reduces prompt size and repeated cleanup effort.
 - Improves cache hit stability by normalizing source content earlier.
+
+---
+
+*Document created by: opencode (kimi-k2.5-free)*

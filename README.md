@@ -181,3 +181,7 @@ Near-term planned work includes:
 - reliability/observability completion for Day 4 scope
 - deployment and portfolio artifacts for Day 5 scope
 - frontend app integration (currently not checked in)
+
+---
+
+*Documentation maintained by: opencode (kimi-k2.5-free)*

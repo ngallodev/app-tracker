@@ -58,3 +58,7 @@
 - If partial, classify findings as:
   - Must fix before merge: incorrect status codes, missing `Retry-After`, broken middleware order, build failure.
   - Can follow up: threshold tuning, stricter sanitization heuristics, extra tests.
+
+---
+
+*Review checklist created by: opencode (kimi-k2.5-free)*
