@@ -26,3 +26,48 @@
   - Document why `ColumnExists` uses a non-parameterized PRAGMA (safe because table name is hardcoded).
 
 Signed-off-by: claude-sonnet-4-5-20250929
+
+---
+
+## Entry 2 — 2026-02-17 — opencode-kimi-k2.5-free
+
+**Branch:** main
+**Commit scope:** Dockerize project with docker-compose
+
+### Changes
+- `docker-compose.yml`: Created root-level compose file defining API and web services
+- `Dockerfile.api`: Multi-stage .NET 10.0 build for Tracker.Api with SQLite volume support
+- `Dockerfile.web`: Node.js 20 Alpine container for Vite React frontend
+- `web/package.json`: Created missing package.json for React + Vite + TypeScript setup
+- `web/index.html`, `web/src/main.tsx`, `web/src/App.tsx`: Created minimal React app structure
+- `web/tsconfig*.json`: Created TypeScript configuration files
+- `.dockerignore`: Added ignore patterns for both root and web directories
+
+### Build Notes
+- API runs on port 5278 (mapped from container port 8080)
+- Web dev server runs on port 5173 with API proxy configured
+- SQLite database persisted in Docker volume `sqlite_data`
+- Optional OPENAI_API_KEY can be passed via environment variable
+- Healthcheck configured for API service
+
+### Usage
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# With OpenAI API key
+OPENAI_API_KEY=your-key docker-compose up -d
+```
+
+### Issues Encountered
+- Web directory had node_modules and package-lock.json but no package.json
+- No React source files existed in web/src/
+- Solution: Created complete minimal React app structure with TypeScript
+
+Signed-off-by: opencode-kimi-k2.5-free
