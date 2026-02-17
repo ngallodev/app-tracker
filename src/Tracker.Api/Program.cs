@@ -28,7 +28,7 @@ builder.Services.AddTrackerHealthChecks();
 builder.Services.Configure<LlmCliOptions>(builder.Configuration.GetSection("Llm"));
 
 // Configure SQLite
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? "Data Source=tracker.db";
 
 builder.Services.AddDbContext<TrackerDbContext>(options =>
@@ -60,7 +60,8 @@ if (app.Environment.IsDevelopment())
 app.MapTrackerHealthEndpoints();
 
 // Version endpoint
-app.MapGet("/version", () => Results.Ok(new { 
+app.MapGet("/version", () => Results.Ok(new
+{
     version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0",
     environment = app.Environment.EnvironmentName,
     llmMode = "cli_headless",
