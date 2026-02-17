@@ -56,3 +56,7 @@ Deliverable format:
 2) Exact commands run and outcomes
 3) Any assumptions made
 4) Remaining risks/open questions
+
+---
+
+*Handoff prompt created by: opencode (kimi-k2.5-free)*
