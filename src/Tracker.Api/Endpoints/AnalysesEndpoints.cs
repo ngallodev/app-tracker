@@ -118,6 +118,26 @@ public static class AnalysesEndpoints
         })
         .WithName("GetAnalysisById");
         
+        // GET /api/analyses/{id}/status - for polling
+        group.MapGet("/{id:guid}/status", async (Guid id, TrackerDbContext db, CancellationToken ct) =>
+        {
+            var analysis = await db.Analyses
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == id, ct);
+            
+            if (analysis is null)
+                return Results.NotFound();
+            
+            return Results.Ok(new 
+            { 
+                id = analysis.Id,
+                status = analysis.Status.ToString(),
+                createdAt = analysis.CreatedAt,
+                errorMessage = analysis.ErrorMessage
+            });
+        })
+        .WithName("GetAnalysisStatus");
+        
         group.MapPost("/", [
             EnableRateLimiting("StrictAnalysisPolicy")
         ] async (
@@ -140,6 +160,16 @@ public static class AnalysesEndpoints
             
             if (string.IsNullOrWhiteSpace(resume.Content))
                 return Results.BadRequest(new { error = "Resume has no content" });
+
+            // Input validation: max lengths
+            const int MaxJdLength = 10000;
+            const int MaxResumeLength = 20000;
+            
+            if (job.DescriptionText.Length > MaxJdLength)
+                return Results.BadRequest(new { error = $"Job description exceeds maximum length of {MaxJdLength} characters" });
+            
+            if (resume.Content.Length > MaxResumeLength)
+                return Results.BadRequest(new { error = $"Resume content exceeds maximum length of {MaxResumeLength} characters" });
 
             // Ensure normalized hashes are present for cache lookups.
             var jobHash = string.IsNullOrWhiteSpace(job.DescriptionHash)
@@ -260,8 +290,12 @@ public static class AnalysesEndpoints
             catch (Exception ex)
             {
                 analysis.Status = AnalysisStatus.Failed;
+                analysis.ErrorMessage = ex.Message;
                 await db.SaveChangesAsync(ct);
-                return Results.Problem(detail: ex.Message, statusCode: 500);
+                return Results.Problem(
+                    detail: ex.Message,
+                    statusCode: 500,
+                    title: "Analysis Failed");
             }
         })
         .WithName("CreateAnalysis");

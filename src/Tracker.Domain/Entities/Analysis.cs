@@ -21,6 +21,9 @@ public class Analysis
     
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     
+    // Error tracking
+    public string? ErrorMessage { get; set; }
+    
     // Navigation properties
     public Job Job { get; set; } = null!;
     public Resume Resume { get; set; } = null!;
