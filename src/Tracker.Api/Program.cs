@@ -75,12 +75,11 @@ app.MapResumeEndpoints();
 // Analysis endpoints
 app.MapAnalysisEndpoints();
 
-// Auto-apply migrations in development
-if (app.Environment.IsDevelopment())
+// Auto-apply migrations on startup
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
-    db.Database.EnsureCreated();
+    db.Database.Migrate();
 }
 
 app.Run();
