@@ -181,7 +181,7 @@ public static class AnalysesEndpoints
     public static IEndpointRouteBuilder MapAnalysisEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/analyses");
-        
+
         // GET /api/analyses
         group.MapGet("/", async (TrackerDbContext db, CancellationToken ct) =>
         {
@@ -190,7 +190,7 @@ public static class AnalysesEndpoints
                 .Include(a => a.Result)
                 .Include(a => a.Logs)
                 .ToListAsync(ct);
-            
+
             var result = analyses
                 .OrderByDescending(a => a.CreatedAt)
                 .Select(ToDto)
@@ -290,7 +290,7 @@ public static class AnalysesEndpoints
             });
         })
         .WithName("GetAnalysisMetrics");
-        
+
         // GET /api/analyses/{id}
         group.MapGet("/{id:guid}", async (Guid id, TrackerDbContext db, CancellationToken ct) =>
         {
@@ -301,26 +301,26 @@ public static class AnalysesEndpoints
                 .Include(a => a.Resume)
                 .Include(a => a.Logs)
                 .FirstOrDefaultAsync(a => a.Id == id, ct);
-            
+
             if (analysis is null)
                 return Results.NotFound();
-            
+
             return Results.Ok(ToDto(analysis));
         })
         .WithName("GetAnalysisById");
-        
+
         // GET /api/analyses/{id}/status - for polling
         group.MapGet("/{id:guid}/status", async (Guid id, TrackerDbContext db, CancellationToken ct) =>
         {
             var analysis = await db.Analyses
                 .AsNoTracking()
                 .FirstOrDefaultAsync(a => a.Id == id, ct);
-            
+
             if (analysis is null)
                 return Results.NotFound();
-            
-            return Results.Ok(new 
-            { 
+
+            return Results.Ok(new
+            {
                 id = analysis.Id,
                 status = analysis.Status.ToString(),
                 createdAt = analysis.CreatedAt,
@@ -328,7 +328,7 @@ public static class AnalysesEndpoints
             });
         })
         .WithName("GetAnalysisStatus");
-        
+
         group.MapPost("/", [
             EnableRateLimiting("StrictAnalysisPolicy")
         ] async (
@@ -348,20 +348,20 @@ public static class AnalysesEndpoints
                     detail: "Job not found",
                     statusCode: StatusCodes.Status400BadRequest,
                     title: "Invalid Analysis Request");
-            
+
             var resume = await db.Resumes.FindAsync([request.ResumeId], ct);
             if (resume is null)
                 return Results.Problem(
                     detail: "Resume not found",
                     statusCode: StatusCodes.Status400BadRequest,
                     title: "Invalid Analysis Request");
-            
+
             if (string.IsNullOrWhiteSpace(job.DescriptionText))
                 return Results.Problem(
                     detail: "Job has no description",
                     statusCode: StatusCodes.Status400BadRequest,
                     title: "Invalid Analysis Request");
-            
+
             if (string.IsNullOrWhiteSpace(resume.Content))
                 return Results.Problem(
                     detail: "Resume has no content",
@@ -379,13 +379,13 @@ public static class AnalysesEndpoints
             // Input validation: max lengths
             const int MaxJdLength = 10000;
             const int MaxResumeLength = 20000;
-            
+
             if (job.DescriptionText.Length > MaxJdLength)
                 return Results.Problem(
                     detail: $"Job description exceeds maximum length of {MaxJdLength} characters",
                     statusCode: StatusCodes.Status400BadRequest,
                     title: "Invalid Analysis Request");
-            
+
             if (resume.Content.Length > MaxResumeLength)
                 return Results.Problem(
                     detail: $"Resume content exceeds maximum length of {MaxResumeLength} characters",
@@ -461,7 +461,7 @@ public static class AnalysesEndpoints
                     requestStopwatch.ElapsedMilliseconds);
                 return Results.Ok(ToDto(cachedAnalysis));
             }
-            
+
             // Create analysis record
             var analysis = new Analysis
             {
@@ -471,10 +471,10 @@ public static class AnalysesEndpoints
                 Status = AnalysisStatus.Running,
                 CreatedAt = DateTimeOffset.UtcNow
             };
-            
+
             db.Analyses.Add(analysis);
             await db.SaveChangesAsync(ct);
-            
+
             try
             {
                 // Run analysis
@@ -483,14 +483,14 @@ public static class AnalysesEndpoints
                     resume.Content,
                     request.Provider,
                     ct);
-                
+
                 // Update analysis record
                 analysis.Status = AnalysisStatus.Completed;
                 analysis.Model = $"{result.Metadata.Provider}/{result.Metadata.Model}";
                 analysis.InputTokens = result.Metadata.TotalInputTokens;
                 analysis.OutputTokens = result.Metadata.TotalOutputTokens;
                 analysis.LatencyMs = result.Metadata.TotalLatencyMs;
-                
+
                 // Store result
                 var analysisResult = new AnalysisResult
                 {
@@ -502,9 +502,9 @@ public static class AnalysesEndpoints
                     MissingPreferredJson = JsonSerializer.Serialize(result.GapAnalysis.MissingPreferred)
                 };
                 analysis.Result = analysisResult;
-                
+
                 db.AnalysisResults.Add(analysisResult);
-                
+
                 // Log each LLM step for parse/repair observability.
                 db.LlmLogs.Add(new LlmLog
                 {
@@ -558,7 +558,7 @@ public static class AnalysesEndpoints
                     outputTokens: result.Metadata.TotalOutputTokens,
                     latencyMs: (int)requestStopwatch.ElapsedMilliseconds,
                     provider: result.Metadata.Provider));
-                
+
                 await db.SaveChangesAsync(ct);
 
                 logger.LogInformation(
@@ -569,7 +569,7 @@ public static class AnalysesEndpoints
                     result.Metadata.TotalInputTokens,
                     result.Metadata.TotalOutputTokens,
                     requestStopwatch.ElapsedMilliseconds);
-                
+
                 return Results.Created(
                     $"/api/analyses/{analysis.Id}",
                     ToDto(
@@ -645,7 +645,7 @@ public static class AnalysesEndpoints
             }
         })
         .WithName("CreateAnalysis");
-        
+
         return app;
     }
 }
