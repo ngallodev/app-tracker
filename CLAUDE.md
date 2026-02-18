@@ -33,3 +33,4 @@ Use this repository in a cost-efficient, deterministic-first way.
 - Any new feature should include a note on how it controls token usage.
 
 8. Sign all documentation, commits, and PRs with agent and model name e.g. codex gpt-5.1-mini or opencode kimi-k2.5-free.  All commits and prs should have detailed descriptions of changes and next steps.
+9. before every commit, create a build log.md file in the root of the repo and document the build process and any issues that were encountered. number date and sign your entry you append to the tail of the log.

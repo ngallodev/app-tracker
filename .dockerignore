@@ -1,0 +1,37 @@
+# .NET build artifacts
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.user
+*.suo
+.vs/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# SQLite
+*.db
+*.db-journal
+
+# Node
+node_modules/
+*.log
+
+# Tests
+tests/
+scripts/
+
+# Misc
+.claude/
