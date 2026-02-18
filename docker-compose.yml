@@ -1,0 +1,38 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: tracker-api
+    ports:
+      - "5278:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/tracker.db
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: ../Dockerfile.web
+    container_name: tracker-web
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://api:8080
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:

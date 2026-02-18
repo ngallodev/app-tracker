@@ -54,3 +54,6 @@ TestResults/
 packages/
 *.nupkg
 *.snupkg
+
+# Node.js
+node_modules/
