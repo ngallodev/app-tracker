@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Tracker.AI;
+using Tracker.AI.Cli;
 using Tracker.AI.Services;
 using Tracker.Domain.DTOs;
 using Tracker.Domain.DTOs.Requests;
@@ -36,11 +37,18 @@ public static class AnalysesEndpoints
             analysis.InputTokens,
             analysis.OutputTokens,
             analysis.LatencyMs,
+            ResolveProvider(analysis),
+            ResolveExecutionMode(analysis),
             analysis.CreatedAt
         );
     }
 
-    private static AnalysisResultDto ToDto(Analysis analysis, string gapMode, bool usedLlmFallback)
+    private static AnalysisResultDto ToDto(
+        Analysis analysis,
+        string gapMode,
+        bool usedLlmFallback,
+        string provider,
+        string executionMode)
     {
         return new AnalysisResultDto(
             analysis.Id,
@@ -57,6 +65,8 @@ public static class AnalysesEndpoints
             analysis.InputTokens,
             analysis.OutputTokens,
             analysis.LatencyMs,
+            provider,
+            executionMode,
             analysis.CreatedAt
         );
     }
@@ -69,14 +79,42 @@ public static class AnalysesEndpoints
             return ("unknown", false);
         }
 
-        var usedFallback = logs.Any(l => l.StepName == "gap_analysis_llm_fallback");
+        var usedFallback = logs.Any(l => l.StepName.StartsWith("gap_analysis_llm_fallback", StringComparison.Ordinal));
         if (usedFallback)
         {
             return (LlmFallbackMode, true);
         }
 
-        var deterministic = logs.Any(l => l.StepName == "gap_analysis_deterministic");
+        var deterministic = logs.Any(l => l.StepName.StartsWith("gap_analysis_deterministic", StringComparison.Ordinal));
         return (deterministic ? DeterministicMode : "unknown", false);
+    }
+
+    private static string ResolveProvider(Analysis analysis)
+    {
+        if (!string.IsNullOrWhiteSpace(analysis.Model))
+        {
+            var slashIdx = analysis.Model.IndexOf('/');
+            if (slashIdx > 0)
+            {
+                return analysis.Model[..slashIdx];
+            }
+        }
+
+        var providerStep = analysis.Logs
+            .Select(l => l.StepName)
+            .FirstOrDefault(name => name.StartsWith("provider_", StringComparison.Ordinal));
+        if (!string.IsNullOrWhiteSpace(providerStep))
+        {
+            return providerStep["provider_".Length..];
+        }
+
+        return "unknown";
+    }
+
+    private static string ResolveExecutionMode(Analysis analysis)
+    {
+        var provider = ResolveProvider(analysis);
+        return provider == "unknown" ? "unknown" : "cli_headless";
     }
 
     public static IEndpointRouteBuilder MapAnalysisEndpoints(this IEndpointRouteBuilder app)
@@ -161,6 +199,14 @@ public static class AnalysesEndpoints
             if (string.IsNullOrWhiteSpace(resume.Content))
                 return Results.BadRequest(new { error = "Resume has no content" });
 
+            if (!string.IsNullOrWhiteSpace(request.Provider) && !LlmProviderCatalog.IsSupported(request.Provider))
+            {
+                return Results.BadRequest(new
+                {
+                    error = $"Invalid provider '{request.Provider}'. Allowed providers: {string.Join(", ", LlmProviderCatalog.List().OrderBy(x => x))}"
+                });
+            }
+
             // Input validation: max lengths
             const int MaxJdLength = 10000;
             const int MaxResumeLength = 20000;
@@ -233,11 +279,12 @@ public static class AnalysesEndpoints
                 var result = await analysisService.AnalyzeAsync(
                     job.DescriptionText,
                     resume.Content,
+                    request.Provider,
                     ct);
                 
                 // Update analysis record
                 analysis.Status = AnalysisStatus.Completed;
-                analysis.Model = result.Metadata.Model;
+                analysis.Model = $"{result.Metadata.Provider}/{result.Metadata.Model}";
                 analysis.InputTokens = result.Metadata.TotalInputTokens;
                 analysis.OutputTokens = result.Metadata.TotalOutputTokens;
                 analysis.LatencyMs = result.Metadata.TotalLatencyMs;
@@ -280,12 +327,38 @@ public static class AnalysesEndpoints
                     RepairAttempted = result.Metadata.GapRepairAttempted,
                     CreatedAt = DateTimeOffset.UtcNow
                 });
+
+                db.LlmLogs.Add(new LlmLog
+                {
+                    Id = Guid.NewGuid(),
+                    AnalysisId = analysis.Id,
+                    StepName = $"provider_{result.Metadata.Provider}",
+                    RawResponse = null,
+                    ParseSuccess = true,
+                    RepairAttempted = false,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
                 
                 await db.SaveChangesAsync(ct);
                 
                 return Results.Created(
                     $"/api/analyses/{analysis.Id}",
-                    ToDto(analysis, result.Metadata.GapAnalysisMode, result.Metadata.UsedGapLlmFallback));
+                    ToDto(
+                        analysis,
+                        result.Metadata.GapAnalysisMode,
+                        result.Metadata.UsedGapLlmFallback,
+                        result.Metadata.Provider,
+                        result.Metadata.ExecutionMode));
+            }
+            catch (LlmException llmEx)
+            {
+                analysis.Status = AnalysisStatus.Failed;
+                analysis.ErrorMessage = llmEx.Message;
+                await db.SaveChangesAsync(ct);
+                return Results.Problem(
+                    detail: llmEx.Message,
+                    statusCode: llmEx.StatusCode ?? 502,
+                    title: "LLM Provider Error");
             }
             catch (Exception ex)
             {

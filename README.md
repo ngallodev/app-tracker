@@ -10,7 +10,7 @@ This backend helps compare a resume against a job description and returns:
 - analysis mode metadata (`deterministic` vs `llm_fallback`)
 - token and latency metadata for traceability
 
-The current repository is API + domain + infrastructure + eval tooling (no frontend app checked in yet).
+The current repository includes a .NET API backend, domain/infrastructure/AI projects, deterministic eval tooling, and a lightweight React/Vite frontend under `web/`.
 
 ## Architecture
 
@@ -57,6 +57,7 @@ Resumes:
 Analyses:
 - `GET /api/analyses`
 - `GET /api/analyses/{id}`
+- `GET /api/analyses/{id}/status`
 - `POST /api/analyses`
 
 ## Security/Request Guardrails (Current)
@@ -169,6 +170,13 @@ Bookmarklet tooling is included to capture and clean JD text locally before subm
 - `docs/bookmarklet_jd_capture.js`
 - `docs/BOOKMARKLET.md`
 
+## Day 5 Documentation Pack
+
+- Architecture diagrams + runtime/deployment notes: `docs/architecture.md`
+- Interview-ready demo walkthrough: `docs/demo-script.md`
+- Portfolio case-study narrative + cost/patterns: [`docs/portfolio-case-study.md`](docs/portfolio-case-study.md)
+- Technical one-paragraph summary: [`docs/technical-blurb.md`](docs/technical-blurb.md)
+
 ## Important Repository Notes
 
 - Planning docs and day-by-day execution breakdowns are in `docs/`.
@@ -180,7 +188,13 @@ Bookmarklet tooling is included to capture and clean JD text locally before subm
 Near-term planned work includes:
 - reliability/observability completion for Day 4 scope
 - deployment and portfolio artifacts for Day 5 scope
-- frontend app integration (currently not checked in)
+- expanding the current minimal frontend into the full analysis workflow UI
+
+## Footnotes: Current TODOs and Next Steps
+
+- Frontend is present in `web/` but currently minimal (`web/src/App.tsx`); next implementation step is shipping the Day 3 analysis-focused workflow UI described in `docs/PLAN.md`.
+- Reliability and observability hardening (retries, correlation IDs, ProblemDetails/error contract completion) remain active implementation targets per `docs/day-4-tasks.md`.
+- Day 5 documentation artifacts are now available in `docs/architecture.md`, `docs/demo-script.md`, and `docs/portfolio-case-study.md`; production deployment execution remains a follow-on task.
 
 ---
 

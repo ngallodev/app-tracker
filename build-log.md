@@ -71,3 +71,40 @@ OPENAI_API_KEY=your-key docker-compose up -d
 - Solution: Created complete minimal React app structure with TypeScript
 
 Signed-off-by: opencode-kimi-k2.5-free
+
+---
+
+## Entry 3 — 2026-02-19 — codex gpt-5
+
+**Branch:** review/code-review-notes
+**Commit scope:** CLI-based LLM provider redesign + multi-provider stubs + API integration + deployment/docs updates
+
+### Changes
+- Added CLI-backed provider architecture in `src/Tracker.AI/Cli/` with:
+  - provider catalog, options, executor, adapter abstraction, and router
+  - provider adapters for `claude`, `codex`, `gemini`, `qwen`, `kilocode`, `opencode`
+- Updated `ILlmClient` to support per-request provider override and provider metadata in `LlmResult<T>`.
+- Updated `AnalysisService` metadata and provider threading through analysis calls.
+- Updated `CreateAnalysisRequest` with optional `Provider` and expanded `AnalysisResultDto` with provider/execution metadata.
+- Updated `AnalysesEndpoints` to:
+  - validate provider values
+  - pass provider override to analysis service
+  - map provider-aware error handling and response metadata
+- Replaced OpenAI-specific dependency health check with CLI provider availability health check.
+- Updated `Program.cs` DI wiring to CLI router and provider adapters.
+- Added `Llm` provider configuration in `src/Tracker.Api/appsettings.json`.
+- Added and updated documentation/deployment artifacts from Day 4/5 work:
+  - `README.md`, `docs/architecture.md`, `docs/demo-script.md`, `docs/portfolio-case-study.md`, `docs/technical-blurb.md`, `fly.toml`, `Dockerfile.api`, `docker-compose.yml`.
+- Added restart handoff file: `RESTART_HANDOFF.md`.
+
+### Build Notes
+- `dotnet build Tracker.slnx -v minimal` succeeded.
+- Runtime health checks succeeded (`/healthz`, `/healthz/deps`) with provider availability details.
+- Deterministic eval runner result remains baseline-incomplete:
+  - `./scripts/run_deterministic_eval.sh` => 1 pass / 1 fail (`backend_api_engineer`).
+
+### Issues Encountered
+- API runtime checks generated SQLite WAL/SHM artifacts (`tracker.db-wal`, `tracker.db-shm`) that are intentionally excluded from commit.
+- Additional CLI providers beyond `claude` are currently unavailable in PATH in this environment and report as unavailable via health checks.
+
+Signed-off-by: codex gpt-5

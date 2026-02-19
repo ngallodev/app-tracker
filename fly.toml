@@ -1,0 +1,35 @@
+app = "app-tracker-api"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile.api"
+
+[env]
+  ASPNETCORE_ENVIRONMENT = "Production"
+  ASPNETCORE_URLS = "http://+:8080"
+  ConnectionStrings__DefaultConnection = "Data Source=/app/data/tracker.db"
+
+[mounts]
+  source = "sqlite_data"
+  destination = "/app/data"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+    force_https = true
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "get"
+    path = "/healthz"
+    protocol = "http"

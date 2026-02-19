@@ -26,14 +26,29 @@ WORKDIR /app
 # Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+# Create non-root runtime user and data directory for SQLite persistence
+RUN getent group app >/dev/null || groupadd --system app \
+    && id -u app >/dev/null 2>&1 || useradd --system --gid app --create-home app \
+    && mkdir -p /app/data /home/app \
+    && chown -R app:app /app /home/app
 
 # Copy published application
-COPY --from=build /app/publish .
+COPY --from=build --chown=app:app /app/publish .
+
+# Runtime configuration
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_EnableDiagnostics=0
 
 # Expose port
 EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -fsS http://localhost:8080/healthz || exit 1
+
+# Drop root privileges
+USER app
 
 # Run the application
 ENTRYPOINT ["dotnet", "Tracker.Api.dll"]
