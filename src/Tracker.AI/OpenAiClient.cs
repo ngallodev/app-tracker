@@ -3,6 +3,9 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using OpenAI.Chat;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 
 namespace Tracker.AI;
 
@@ -15,10 +18,12 @@ public class OpenAiClient : ILlmClient
     private readonly string _chatModel;
     private readonly string _embeddingModel;
     private readonly ILogger<OpenAiClient> _logger;
+    private readonly IAsyncPolicy _resiliencePolicy;
 
     public OpenAiClient(
         OpenAIClient client,
         ILogger<OpenAiClient> logger,
+        IAsyncPolicy resiliencePolicy,
         string chatModel = "gpt-4o-mini",
         string embeddingModel = "text-embedding-3-small")
     {
@@ -26,11 +31,13 @@ public class OpenAiClient : ILlmClient
         _chatModel = chatModel;
         _embeddingModel = embeddingModel;
         _logger = logger;
+        _resiliencePolicy = resiliencePolicy;
     }
 
     public async Task<LlmResult<T>> CompleteStructuredAsync<T>(
         string systemPrompt,
         string userPrompt,
+        string? providerOverride = null,
         CancellationToken cancellationToken = default) where T : class
     {
         var sw = Stopwatch.StartNew();
@@ -54,8 +61,9 @@ public class OpenAiClient : ILlmClient
 
         try
         {
-            var completion = await _client.GetChatClient(_chatModel)
-                .CompleteChatAsync(messages, options, cancellationToken);
+            var completion = await _resiliencePolicy.ExecuteAsync(async ct =>
+                await _client.GetChatClient(_chatModel).CompleteChatAsync(messages, options, ct),
+                cancellationToken);
             var content = ExtractContent(completion.Value);
 
             totalInputTokens += completion.Value.Usage.InputTokenCount;
@@ -90,8 +98,9 @@ public class OpenAiClient : ILlmClient
                         """)
                 };
 
-                var repairCompletion = await _client.GetChatClient(_chatModel)
-                    .CompleteChatAsync(repairMessages, options, cancellationToken);
+                var repairCompletion = await _resiliencePolicy.ExecuteAsync(async ct =>
+                    await _client.GetChatClient(_chatModel).CompleteChatAsync(repairMessages, options, ct),
+                    cancellationToken);
                 content = ExtractContent(repairCompletion.Value);
                 totalInputTokens += repairCompletion.Value.Usage.InputTokenCount;
                 totalOutputTokens += repairCompletion.Value.Usage.OutputTokenCount;
@@ -114,12 +123,28 @@ public class OpenAiClient : ILlmClient
                     InputTokens = totalInputTokens,
                     OutputTokens = totalOutputTokens
                 },
+                Provider = "openai",
                 Model = _chatModel,
                 LatencyMs = (int)sw.ElapsedMilliseconds,
                 ParseSuccess = initialParseSuccess,
                 RepairAttempted = repairAttempted,
                 RawResponse = content
             };
+        }
+        catch (BrokenCircuitException ex)
+        {
+            _logger.LogError(ex, "LLM circuit breaker is open");
+            throw new LlmException("LLM provider circuit breaker is open. Please retry shortly.", 503, "llm_circuit_open");
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            _logger.LogWarning(ex, "LLM request timed out");
+            throw new LlmException("LLM request timed out.", 504, "llm_timeout");
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "LLM request timed out");
+            throw new LlmException("LLM request timed out.", 504, "llm_timeout");
         }
         catch (Exception ex)
         {
@@ -130,14 +155,32 @@ public class OpenAiClient : ILlmClient
 
     public async Task<float[]> GetEmbeddingAsync(
         string text,
+        string? providerOverride = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await _client.GetEmbeddingClient(_embeddingModel)
-                .GenerateEmbeddingAsync(text, cancellationToken: cancellationToken);
+            var response = await _resiliencePolicy.ExecuteAsync(async ct =>
+                await _client.GetEmbeddingClient(_embeddingModel)
+                    .GenerateEmbeddingAsync(text, cancellationToken: ct),
+                cancellationToken);
             
             return response.Value.ToFloats().ToArray();
+        }
+        catch (BrokenCircuitException ex)
+        {
+            _logger.LogError(ex, "Embedding request blocked by circuit breaker");
+            throw new LlmException("LLM provider circuit breaker is open. Please retry shortly.", 503, "llm_circuit_open");
+        }
+        catch (TimeoutRejectedException ex)
+        {
+            _logger.LogWarning(ex, "Embedding request timed out");
+            throw new LlmException("Embedding request timed out.", 504, "llm_timeout");
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Embedding request timed out");
+            throw new LlmException("Embedding request timed out.", 504, "llm_timeout");
         }
         catch (Exception ex)
         {

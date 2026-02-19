@@ -1,18 +1,31 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
-using OpenAI;
+using Serilog;
 using Tracker.Api.Endpoints;
 using Tracker.Api.Extensions;
 using Tracker.Api.Middleware;
 using Tracker.AI;
+using Tracker.AI.Cli;
+using Tracker.AI.Cli.Providers;
 using Tracker.AI.Services;
 using Tracker.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "Tracker.Api")
+        .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName);
+});
 
 // Add services to the container
 builder.Services.AddOpenApi();
 builder.Services.AddAnalysisRateLimiting();
+builder.Services.AddTrackerHealthChecks();
+builder.Services.Configure<LlmCliOptions>(builder.Configuration.GetSection("Llm"));
 
 // Configure SQLite
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
@@ -21,33 +34,22 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<TrackerDbContext>(options =>
     options.UseSqlite(connectionString));
 
-// Configure OpenAI
-var openAiApiKey = builder.Configuration["OpenAI:ApiKey"] 
-    ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-
-if (!string.IsNullOrEmpty(openAiApiKey))
-{
-    var openAIClient = new OpenAIClient(openAiApiKey);
-    builder.Services.AddSingleton<OpenAIClient>(openAIClient);
-    builder.Services.AddSingleton<ILlmClient>(sp => 
-        new OpenAiClient(
-            openAIClient,
-            sp.GetRequiredService<ILogger<OpenAiClient>>(),
-            builder.Configuration["OpenAI:ChatModel"] ?? "gpt-4o-mini",
-            builder.Configuration["OpenAI:EmbeddingModel"] ?? "text-embedding-3-small"));
-    builder.Services.AddScoped<IAnalysisService, AnalysisService>();
-}
-else
-{
-    // In development without API key, use a placeholder
-    builder.Services.AddSingleton<ILlmClient>(sp => 
-        new FakeLlmClient(sp.GetRequiredService<ILogger<FakeLlmClient>>()));
-    builder.Services.AddScoped<IAnalysisService, AnalysisService>();
-}
+builder.Services.AddSingleton<IHeadlessCliExecutor, HeadlessCliExecutor>();
+builder.Services.AddSingleton<ICliProviderAdapter, ClaudeCliProviderAdapter>();
+builder.Services.AddSingleton<ICliProviderAdapter, CodexCliProviderAdapter>();
+builder.Services.AddSingleton<ICliProviderAdapter, GeminiCliProviderAdapter>();
+builder.Services.AddSingleton<ICliProviderAdapter, QwenCliProviderAdapter>();
+builder.Services.AddSingleton<ICliProviderAdapter, KilocodeCliProviderAdapter>();
+builder.Services.AddSingleton<ICliProviderAdapter, OpencodeCliProviderAdapter>();
+builder.Services.AddSingleton<ILlmClient, CliLlmClientRouter>();
+builder.Services.AddScoped<IAnalysisService, AnalysisService>();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
+app.UseGlobalExceptionHandling();
+app.UseCorrelationId();
+app.UseSecurityHeaders();
 app.UseInputValidation();
 app.UseRateLimiter();
 if (app.Environment.IsDevelopment())
@@ -55,15 +57,14 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-// Health endpoint
-app.MapGet("/healthz", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
-    .WithName("HealthCheck");
+app.MapTrackerHealthEndpoints();
 
 // Version endpoint
 app.MapGet("/version", () => Results.Ok(new { 
     version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0",
     environment = app.Environment.EnvironmentName,
-    openAiConfigured = !string.IsNullOrEmpty(openAiApiKey)
+    llmMode = "cli_headless",
+    defaultProvider = builder.Configuration["Llm:DefaultProvider"] ?? LlmProviderCatalog.Claude
 }))
 .WithName("GetVersion");
 
@@ -93,7 +94,7 @@ file static class MigrationBootstrapper
     private const string InitialCreateMigrationSuffix = "_InitialCreate";
     private const string AddErrorMessageMigrationSuffix = "_AddAnalysisErrorMessage";
 
-    public static void ApplyMigrationsWithLegacySqliteSupport(TrackerDbContext db, ILogger logger)
+    public static void ApplyMigrationsWithLegacySqliteSupport(TrackerDbContext db, Microsoft.Extensions.Logging.ILogger logger)
     {
         if (db.Database.IsSqlite())
         {
@@ -103,7 +104,7 @@ file static class MigrationBootstrapper
         db.Database.Migrate();
     }
 
-    private static void BackfillMigrationHistoryForLegacySqlite(TrackerDbContext db, ILogger logger)
+    private static void BackfillMigrationHistoryForLegacySqlite(TrackerDbContext db, Microsoft.Extensions.Logging.ILogger logger)
     {
         if (TableExists(db, HistoryTable))
         {
@@ -274,22 +275,4 @@ file static class MigrationBootstrapper
 
     private static string GetProductVersion()
         => typeof(DbContext).Assembly.GetName().Version?.ToString() ?? "unknown";
-}
-
-// Fake LLM client for development without API key
-file record FakeLlmClient(ILogger<FakeLlmClient> Logger) : ILlmClient
-{
-    public Task<LlmResult<T>> CompleteStructuredAsync<T>(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default) where T : class
-    {
-        Logger.LogWarning("Using FakeLlmClient - Set OPENAI_API_KEY environment variable for real LLM calls");
-        throw new LlmException("OpenAI API key not configured. Set OPENAI_API_KEY environment variable.");
-    }
-
-    public Task<float[]> GetEmbeddingAsync(string text, CancellationToken cancellationToken = default)
-    {
-        Logger.LogWarning("Using FakeLlmClient - Set OPENAI_API_KEY environment variable for real LLM calls");
-        throw new LlmException("OpenAI API key not configured. Set OPENAI_API_KEY environment variable.");
-    }
-
-    public int CountTokens(string text) => text.Length / 4;
 }
