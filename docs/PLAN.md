@@ -31,6 +31,20 @@ This is a disciplined AI system, not a ChatGPT wrapper.
 
 ---
 
+# Implementation Drift Snapshot (February 25, 2026)
+
+This document remains the original execution plan. The codebase has intentionally diverged in a few important ways:
+
+- Runtime LLM integration is currently **CLI-provider headless execution** (Claude/Codex/Gemini/etc. adapters) instead of the OpenAI SDK-first runtime described below.
+- Day 3 UI is partially shipped as a single-page workflow: create/delete jobs and resumes, run analyses, inspect analysis metrics/skills, and trigger/view deterministic eval runs. Edit/update UI flows and dedicated routed pages are still missing.
+- `/eval/run` and `/eval/runs` API endpoints now exist and persist deterministic eval summaries, but there is not yet a standalone eval dashboard page.
+- Day 4 reliability/security work is partially implemented (correlation IDs, exception middleware, security headers, input validation, rate limiting), but runtime resilience behavior for CLI providers is not fully aligned with the Polly/OpenAI-focused plan narrative.
+- Test coverage and deployment success criteria listed later in this plan are not yet met.
+
+Signed: codex gpt-5
+
+---
+
 # Architecture Overview
 
 ```
@@ -66,6 +80,12 @@ This is a disciplined AI system, not a ChatGPT wrapper.
 | Frontend | React 18 + Vite + TanStack Query | Polling, optimistic updates |
 | Testing | xUnit + NSubstitute | WebApplicationFactory, HttpClient mocking |
 | Resilience | Polly | Retry, circuit breaker, timeout |
+
+---
+
+## Current Runtime Note (Implementation)
+
+As of February 25, 2026, the shipped API runtime is wired to `Tracker.AI.Cli` provider adapters (`CliLlmClientRouter`) rather than the OpenAI SDK path shown in the architecture diagram and AI stack row above. Treat the OpenAI-specific sections below as design intent unless/until the runtime is switched back.
 
 ---
 

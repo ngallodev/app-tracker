@@ -17,6 +17,7 @@ public interface IAnalysisService
     Task<AnalysisPipelineResult> AnalyzeAsync(
         string jobDescription,
         string resumeText,
+        string? providerOverride = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -43,6 +44,8 @@ public record AnalysisScores
 
 public record AnalysisMetadata
 {
+    public required string Provider { get; init; }
+    public required string ExecutionMode { get; init; }
     public required int TotalInputTokens { get; init; }
     public required int TotalOutputTokens { get; init; }
     public required int TotalLatencyMs { get; init; }
@@ -71,6 +74,7 @@ public class AnalysisService : IAnalysisService
     public async Task<AnalysisPipelineResult> AnalyzeAsync(
         string jobDescription,
         string resumeText,
+        string? providerOverride = null,
         CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
@@ -83,6 +87,7 @@ public class AnalysisService : IAnalysisService
         var jdResult = await _llmClient.CompleteStructuredAsync<JdExtraction>(
             JdExtractionPrompt.SystemPrompt,
             JdExtractionPrompt.UserPrompt(jobDescription),
+            providerOverride,
             cancellationToken);
         
         totalInputTokens += jdResult.Usage.InputTokens;
@@ -103,6 +108,7 @@ public class AnalysisService : IAnalysisService
         {
             Value = deterministicGap,
             Usage = new LlmUsage { InputTokens = 0, OutputTokens = 0 },
+            Provider = "deterministic",
             Model = "deterministic-skill-matcher",
             LatencyMs = (int)deterministicSw.ElapsedMilliseconds,
             ParseSuccess = true,
@@ -123,6 +129,7 @@ public class AnalysisService : IAnalysisService
             gapResult = await _llmClient.CompleteStructuredAsync<GapAnalysis>(
                 GapAnalysisPrompt.SystemPrompt,
                 GapAnalysisPrompt.UserPrompt(jdJson, resumeText),
+                providerOverride,
                 cancellationToken);
 
             totalInputTokens += gapResult.Usage.InputTokens;
@@ -147,6 +154,8 @@ public class AnalysisService : IAnalysisService
             Scores = scores,
             Metadata = new AnalysisMetadata
             {
+                Provider = jdResult.Provider,
+                ExecutionMode = "cli_headless",
                 TotalInputTokens = totalInputTokens,
                 TotalOutputTokens = totalOutputTokens,
                 TotalLatencyMs = (int)sw.ElapsedMilliseconds,

@@ -13,6 +13,7 @@ public interface ILlmClient
     Task<LlmResult<T>> CompleteStructuredAsync<T>(
         string systemPrompt,
         string userPrompt,
+        string? providerOverride = null,
         CancellationToken cancellationToken = default) where T : class;
     
     /// <summary>
@@ -20,6 +21,7 @@ public interface ILlmClient
     /// </summary>
     Task<float[]> GetEmbeddingAsync(
         string text,
+        string? providerOverride = null,
         CancellationToken cancellationToken = default);
     
     /// <summary>
@@ -35,6 +37,7 @@ public record LlmResult<T>
 {
     public required T Value { get; init; }
     public required LlmUsage Usage { get; init; }
+    public required string Provider { get; init; }
     public required string Model { get; init; }
     public required int LatencyMs { get; init; }
     public bool ParseSuccess { get; init; } = true;

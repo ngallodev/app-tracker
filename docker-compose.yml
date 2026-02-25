@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile.api
     container_name: tracker-api
     ports:
-      - "5278:8080"
+      - "8080:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
       - ASPNETCORE_URLS=http://+:8080
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/tracker.db
@@ -31,8 +31,10 @@ services:
     environment:
       - VITE_API_URL=http://api:8080
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   sqlite_data:
+    driver: local
