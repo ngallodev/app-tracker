@@ -187,24 +187,36 @@ public static class AnalysesEndpoints
             // Verify job and resume exist
             var job = await db.Jobs.FindAsync([request.JobId], ct);
             if (job is null)
-                return Results.BadRequest(new { error = "Job not found" });
+                return Results.Problem(
+                    detail: "Job not found",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Analysis Request");
             
             var resume = await db.Resumes.FindAsync([request.ResumeId], ct);
             if (resume is null)
-                return Results.BadRequest(new { error = "Resume not found" });
+                return Results.Problem(
+                    detail: "Resume not found",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Analysis Request");
             
             if (string.IsNullOrWhiteSpace(job.DescriptionText))
-                return Results.BadRequest(new { error = "Job has no description" });
+                return Results.Problem(
+                    detail: "Job has no description",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Analysis Request");
             
             if (string.IsNullOrWhiteSpace(resume.Content))
-                return Results.BadRequest(new { error = "Resume has no content" });
+                return Results.Problem(
+                    detail: "Resume has no content",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Analysis Request");
 
             if (!string.IsNullOrWhiteSpace(request.Provider) && !LlmProviderCatalog.IsSupported(request.Provider))
             {
-                return Results.BadRequest(new
-                {
-                    error = $"Invalid provider '{request.Provider}'. Allowed providers: {string.Join(", ", LlmProviderCatalog.List().OrderBy(x => x))}"
-                });
+                return Results.Problem(
+                    detail: $"Invalid provider '{request.Provider}'. Allowed providers: {string.Join(", ", LlmProviderCatalog.List().OrderBy(x => x))}",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Analysis Request");
             }
 
             // Input validation: max lengths
@@ -212,10 +224,16 @@ public static class AnalysesEndpoints
             const int MaxResumeLength = 20000;
             
             if (job.DescriptionText.Length > MaxJdLength)
-                return Results.BadRequest(new { error = $"Job description exceeds maximum length of {MaxJdLength} characters" });
+                return Results.Problem(
+                    detail: $"Job description exceeds maximum length of {MaxJdLength} characters",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Analysis Request");
             
             if (resume.Content.Length > MaxResumeLength)
-                return Results.BadRequest(new { error = $"Resume content exceeds maximum length of {MaxResumeLength} characters" });
+                return Results.Problem(
+                    detail: $"Resume content exceeds maximum length of {MaxResumeLength} characters",
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Invalid Analysis Request");
 
             // Ensure normalized hashes are present for cache lookups.
             var jobHash = string.IsNullOrWhiteSpace(job.DescriptionHash)

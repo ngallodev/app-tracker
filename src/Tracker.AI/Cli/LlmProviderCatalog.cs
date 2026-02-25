@@ -2,6 +2,7 @@ namespace Tracker.AI.Cli;
 
 public static class LlmProviderCatalog
 {
+    public const string Kilo = "kilo";
     public const string Claude = "claude";
     public const string Codex = "codex";
     public const string Gemini = "gemini";
@@ -19,8 +20,18 @@ public static class LlmProviderCatalog
         Opencode
     };
 
-    public static bool IsSupported(string? value) =>
-        !string.IsNullOrWhiteSpace(value) && Allowed.Contains(value);
+    public static bool IsSupported(string? value)
+    {
+        try
+        {
+            NormalizeOrThrow(value);
+            return true;
+        }
+        catch (LlmException)
+        {
+            return false;
+        }
+    }
 
     public static string NormalizeOrThrow(string? value)
     {
@@ -30,6 +41,11 @@ public static class LlmProviderCatalog
         }
 
         var normalized = value.Trim().ToLowerInvariant();
+        if (normalized == Kilo)
+        {
+            normalized = Kilocode;
+        }
+
         if (!Allowed.Contains(normalized))
         {
             throw new LlmException(
@@ -42,4 +58,14 @@ public static class LlmProviderCatalog
     }
 
     public static IReadOnlyCollection<string> List() => Allowed;
+
+    public static IReadOnlyList<string> GetDefaultCommandCandidates(string provider)
+    {
+        var normalized = NormalizeOrThrow(provider);
+        return normalized switch
+        {
+            Kilocode => [Kilo, Kilocode],
+            _ => [normalized]
+        };
+    }
 }

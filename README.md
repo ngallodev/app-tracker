@@ -10,7 +10,8 @@ This backend helps compare a resume against a job description and returns:
 - analysis mode metadata (`deterministic` vs `llm_fallback`)
 - token and latency metadata for traceability
 
-The current repository includes a .NET API backend, domain/infrastructure/AI projects, deterministic eval tooling, and a lightweight React/Vite frontend under `web/`.
+The current repository includes a .NET API backend, domain/infrastructure/AI projects, deterministic eval tooling, and a React/Vite frontend under `web/`.
+The frontend currently supports create/delete job+resume flows, running analyses, viewing analysis metrics/skills, and triggering/viewing deterministic eval runs.
 
 ## Architecture
 
@@ -34,10 +35,12 @@ Core request flow (`POST /api/analyses`):
 
 ## Current API Surface
 
-Base URL in development: `http://localhost:5278`
+Base URL in development: `http://0.0.0.0:5278` (or `http://localhost:5278` from the same machine)
 
 Utility:
 - `GET /healthz`
+- `GET /healthz/ready`
+- `GET /healthz/deps`
 - `GET /version`
 
 Jobs:
@@ -60,6 +63,10 @@ Analyses:
 - `GET /api/analyses/{id}/status`
 - `POST /api/analyses`
 
+Eval:
+- `GET /eval/runs`
+- `POST /eval/run`
+
 ## Security/Request Guardrails (Current)
 
 - Rate limiting enabled for analysis creation endpoint with strict policy.
@@ -74,11 +81,14 @@ Analyses:
 ## Prerequisites
 
 - .NET SDK `10.0` (target framework is `net10.0`)
-- Optional: `OPENAI_API_KEY` for live LLM-powered analysis calls
+- CLI providers available in `PATH` (default auto-detect targets):
+  - `claude`, `codex`, `gemini`, `qwen`, `opencode`
+  - `kilo` (or `kilocode`) for the `kilocode` provider
 
 Notes:
-- Without `OPENAI_API_KEY`, the API starts, but live analysis calls will fail through `FakeLlmClient`.
-- Deterministic eval runner works without any API key.
+- You can force a provider binary with `Llm:Providers:<provider>:Command` (absolute path or command name).
+- Provider-specific flags can be configured with `Llm:Providers:<provider>:ExtraFlags`.
+- Deterministic eval runner works without any provider CLI.
 
 ## Local Development
 
@@ -92,10 +102,15 @@ dotnet build Tracker.slnx -v minimal
 Run API:
 
 ```bash
-dotnet run --project src/Tracker.Api/Tracker.Api.csproj
+./scripts/run_api.sh
 ```
 
-API is available at `http://localhost:5278` by default (see `src/Tracker.Api/Properties/launchSettings.json`).
+API binds to `http://0.0.0.0:5278` by default, so it is reachable from other machines on your network.
+Use `HOST` and `PORT` to override:
+
+```bash
+HOST=0.0.0.0 PORT=5278 ./scripts/run_api.sh
+```
 
 ## Minimal API Smoke Flow
 
@@ -141,6 +156,15 @@ curl -sS http://localhost:5278/api/analyses
 ```
 
 ## Deterministic Evaluation Harness
+
+HTTP eval endpoints:
+- `POST /eval/run` runs the deterministic fixture suite and persists an `eval_runs` summary row
+- `GET /eval/runs` returns recent persisted eval summaries
+
+Frontend support:
+- `web/src/App.tsx` includes an eval panel to trigger `/eval/run` and view recent eval history
+
+CLI eval runner:
 
 Run fixture evals:
 
@@ -188,12 +212,13 @@ Bookmarklet tooling is included to capture and clean JD text locally before subm
 Near-term planned work includes:
 - reliability/observability completion for Day 4 scope
 - deployment and portfolio artifacts for Day 5 scope
-- expanding the current minimal frontend into the full analysis workflow UI
+- frontend CRUD parity for edit/update flows (create/delete/run-analysis/detail are implemented)
+- dedicated routed pages for analysis and eval dashboards (current UI is a single-page workflow)
 
 ## Footnotes: Current TODOs and Next Steps
 
-- Frontend is present in `web/` but currently minimal (`web/src/App.tsx`); next implementation step is shipping the Day 3 analysis-focused workflow UI described in `docs/PLAN.md`.
-- Reliability and observability hardening (retries, correlation IDs, ProblemDetails/error contract completion) remain active implementation targets per `docs/day-4-tasks.md`.
+- Frontend in `web/src/App.tsx` now supports create/delete jobs and resumes, running analyses, viewing analysis metrics/skills, and deterministic eval run/history; remaining UI gaps are edit/update flows and dedicated routed pages.
+- Reliability and observability hardening remain active implementation targets per `docs/day-4-tasks.md`, especially aligning runtime resilience behavior for CLI-provider execution with the original Polly-focused design intent.
 - Day 5 documentation artifacts are now available in `docs/architecture.md`, `docs/demo-script.md`, and `docs/portfolio-case-study.md`; production deployment execution remains a follow-on task.
 
 ---

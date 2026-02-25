@@ -14,20 +14,31 @@ public sealed class HeadlessCliExecutor : IHeadlessCliExecutor
 
     public ProviderAvailability CheckAvailability(string provider, CliProviderOptions options)
     {
+        var normalizedProvider = LlmProviderCatalog.NormalizeOrThrow(provider);
         if (!options.Enabled)
         {
-            return new ProviderAvailability(provider, false, false, options.Command, null, "Provider disabled in config.");
+            return new ProviderAvailability(normalizedProvider, false, false, options.Command, null, "Provider disabled in config.");
         }
 
-        if (string.IsNullOrWhiteSpace(options.Command))
+        var resolution = ResolveProviderCommand(normalizedProvider, options.Command);
+        if (!resolution.Found)
         {
-            return new ProviderAvailability(provider, true, false, null, null, "No command configured.");
+            return new ProviderAvailability(
+                normalizedProvider,
+                true,
+                false,
+                resolution.SelectedCommand,
+                null,
+                resolution.Message);
         }
 
-        var resolved = ResolveCommandPath(options.Command);
-        return resolved is null
-            ? new ProviderAvailability(provider, true, false, options.Command, null, "Command not found in PATH.")
-            : new ProviderAvailability(provider, true, true, options.Command, resolved, "Ready.");
+        return new ProviderAvailability(
+            normalizedProvider,
+            true,
+            true,
+            resolution.SelectedCommand,
+            resolution.ResolvedPath,
+            "Ready.");
     }
 
     public async Task<CliExecutionResult> ExecuteAsync(
@@ -36,16 +47,17 @@ public sealed class HeadlessCliExecutor : IHeadlessCliExecutor
         string input,
         CancellationToken cancellationToken = default)
     {
-        var availability = CheckAvailability(provider, options);
+        var normalizedProvider = LlmProviderCatalog.NormalizeOrThrow(provider);
+        var availability = CheckAvailability(normalizedProvider, options);
         if (!availability.Enabled)
         {
-            throw new LlmException($"Provider '{provider}' is disabled.", 503, "provider_unavailable");
+            throw new LlmException($"Provider '{normalizedProvider}' is disabled.", 503, "provider_unavailable");
         }
 
         if (!availability.Available || string.IsNullOrWhiteSpace(availability.ResolvedCommandPath))
         {
             throw new LlmException(
-                $"Provider '{provider}' command '{options.Command}' is unavailable ({availability.Message}).",
+                $"Provider '{normalizedProvider}' command '{availability.Command ?? options.Command ?? "auto"}' is unavailable ({availability.Message}).",
                 503,
                 "provider_unavailable");
         }
@@ -53,13 +65,17 @@ public sealed class HeadlessCliExecutor : IHeadlessCliExecutor
         var startInfo = new ProcessStartInfo
         {
             FileName = availability.ResolvedCommandPath,
-            Arguments = options.Arguments ?? string.Empty,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
         };
+        var argumentString = BuildArguments(options);
+        if (!string.IsNullOrWhiteSpace(argumentString))
+        {
+            startInfo.Arguments = argumentString;
+        }
 
         using var process = new Process { StartInfo = startInfo };
         var sw = Stopwatch.StartNew();
@@ -84,8 +100,8 @@ public sealed class HeadlessCliExecutor : IHeadlessCliExecutor
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             TryKill(process);
-            _logger.LogWarning("Provider {Provider} command timed out after {Timeout}s", provider, options.TimeoutSeconds);
-            throw new LlmException($"Provider '{provider}' timed out.", 504, "llm_timeout");
+            _logger.LogWarning("Provider {Provider} command timed out after {Timeout}s", normalizedProvider, options.TimeoutSeconds);
+            throw new LlmException($"Provider '{normalizedProvider}' timed out.", 504, "llm_timeout");
         }
 
         sw.Stop();
@@ -95,6 +111,37 @@ public sealed class HeadlessCliExecutor : IHeadlessCliExecutor
             stderrTask.Result,
             (int)sw.ElapsedMilliseconds,
             availability.ResolvedCommandPath);
+    }
+
+    private static string BuildArguments(CliProviderOptions options)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(options.Arguments))
+        {
+            parts.Add(options.Arguments.Trim());
+        }
+
+        foreach (var flag in options.ExtraFlags)
+        {
+            if (!string.IsNullOrWhiteSpace(flag))
+            {
+                parts.Add(EscapeArgument(flag.Trim()));
+            }
+        }
+
+        return string.Join(" ", parts);
+    }
+
+    private static string EscapeArgument(string value)
+    {
+        if (value.Length == 0)
+        {
+            return "\"\"";
+        }
+
+        return value.Any(char.IsWhiteSpace) || value.Contains('"')
+            ? $"\"{value.Replace("\"", "\\\"", StringComparison.Ordinal)}\""
+            : value;
     }
 
     private static void TryKill(Process process)
@@ -135,5 +182,30 @@ public sealed class HeadlessCliExecutor : IHeadlessCliExecutor
         }
 
         return null;
+    }
+
+    private static (bool Found, string? SelectedCommand, string? ResolvedPath, string Message) ResolveProviderCommand(
+        string provider,
+        string? configuredCommand)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredCommand))
+        {
+            var resolvedConfigured = ResolveCommandPath(configuredCommand);
+            return resolvedConfigured is null
+                ? (false, configuredCommand, null, "Configured command not found in PATH.")
+                : (true, configuredCommand, resolvedConfigured, "Ready.");
+        }
+
+        var candidates = LlmProviderCatalog.GetDefaultCommandCandidates(provider);
+        foreach (var candidate in candidates)
+        {
+            var resolved = ResolveCommandPath(candidate);
+            if (resolved is not null)
+            {
+                return (true, candidate, resolved, "Ready.");
+            }
+        }
+
+        return (false, null, null, $"No configured command. Auto-detect failed for PATH candidates: {string.Join(", ", candidates)}.");
     }
 }

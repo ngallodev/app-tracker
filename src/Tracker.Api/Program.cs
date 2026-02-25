@@ -77,6 +77,9 @@ app.MapResumeEndpoints();
 // Analysis endpoints
 app.MapAnalysisEndpoints();
 
+// Eval endpoints
+app.MapEvalEndpoints();
+
 // Auto-apply migrations on startup
 using (var scope = app.Services.CreateScope())
 {
@@ -102,6 +105,11 @@ file static class MigrationBootstrapper
         }
 
         db.Database.Migrate();
+
+        if (db.Database.IsSqlite())
+        {
+            EnsureSupplementalTables(db);
+        }
     }
 
     private static void BackfillMigrationHistoryForLegacySqlite(TrackerDbContext db, Microsoft.Extensions.Logging.ILogger logger)
@@ -221,6 +229,29 @@ file static class MigrationBootstrapper
         using var command = db.Database.GetDbConnection().CreateCommand();
         command.CommandText = sql;
         EnsureOpenAndExecuteNonQuery(command);
+    }
+
+    private static void EnsureSupplementalTables(TrackerDbContext db)
+    {
+        ExecuteNonQuery(
+            db,
+            """
+            CREATE TABLE IF NOT EXISTS "eval_runs" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_eval_runs" PRIMARY KEY,
+                "Mode" TEXT NOT NULL,
+                "FixtureCount" INTEGER NOT NULL,
+                "PassedCount" INTEGER NOT NULL,
+                "FailedCount" INTEGER NOT NULL,
+                "SchemaPassRate" TEXT NOT NULL,
+                "GroundednessRate" TEXT NOT NULL,
+                "CoverageStabilityDiff" TEXT NOT NULL,
+                "AvgLatencyMs" TEXT NOT NULL,
+                "AvgCostPerRunUsd" TEXT NOT NULL,
+                "ResultsJson" TEXT NOT NULL,
+                "CreatedAt" TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_eval_runs_CreatedAt" ON "eval_runs" ("CreatedAt");
+            """);
     }
 
     private static long EnsureOpenAndExecuteScalarInt64(IDbCommand command)

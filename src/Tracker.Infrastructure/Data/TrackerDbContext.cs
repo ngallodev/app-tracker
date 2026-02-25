@@ -12,6 +12,7 @@ public class TrackerDbContext : DbContext
     public DbSet<Analysis> Analyses => Set<Analysis>();
     public DbSet<AnalysisResult> AnalysisResults => Set<AnalysisResult>();
     public DbSet<LlmLog> LlmLogs => Set<LlmLog>();
+    public DbSet<EvalRun> EvalRuns => Set<EvalRun>();
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -107,6 +108,22 @@ public class TrackerDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             
             entity.HasIndex(e => e.AnalysisId);
+        });
+
+        modelBuilder.Entity<EvalRun>(entity =>
+        {
+            entity.ToTable("eval_runs");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasDefaultValueSql("newid()");
+            entity.Property(e => e.Mode).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.SchemaPassRate).HasPrecision(5, 2);
+            entity.Property(e => e.GroundednessRate).HasPrecision(5, 2);
+            entity.Property(e => e.CoverageStabilityDiff).HasPrecision(8, 4);
+            entity.Property(e => e.AvgLatencyMs).HasPrecision(10, 2);
+            entity.Property(e => e.AvgCostPerRunUsd).HasPrecision(10, 4);
+            entity.Property(e => e.ResultsJson).IsRequired();
+            entity.Property(e => e.CreatedAt).IsRequired();
+            entity.HasIndex(e => e.CreatedAt);
         });
     }
 }

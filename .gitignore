@@ -25,6 +25,8 @@ x86/
 *.sqlite
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 
 # Environment variables
 .env

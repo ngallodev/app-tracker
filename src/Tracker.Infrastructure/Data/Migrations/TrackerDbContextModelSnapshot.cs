@@ -96,6 +96,61 @@ namespace Tracker.Infrastructure.Data.Migrations
                     b.ToTable("analysis_results", (string)null);
                 });
 
+            modelBuilder.Entity("Tracker.Domain.Entities.EvalRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValueSql("newid()");
+
+                    b.Property<decimal>("AvgCostPerRunUsd")
+                        .HasPrecision(10, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("AvgLatencyMs")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("CoverageStabilityDiff")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FailedCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("FixtureCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("GroundednessRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PassedCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ResultsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SchemaPassRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.ToTable("eval_runs", (string)null);
+                });
+
             modelBuilder.Entity("Tracker.Domain.Entities.Job", b =>
                 {
                     b.Property<Guid>("Id")
