@@ -59,3 +59,5 @@ packages/
 
 # Node.js
 node_modules/
+
+.fake

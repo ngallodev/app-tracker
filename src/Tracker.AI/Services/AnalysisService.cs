@@ -104,6 +104,20 @@ public class AnalysisService : IAnalysisService
         var deterministicSw = Stopwatch.StartNew();
         var deterministicGap = DeterministicGapMatcher.Build(jdResult.Value, resumeText);
         deterministicSw.Stop();
+        var deterministicElapsedMs = (int)deterministicSw.ElapsedMilliseconds;
+        var requiredMatches = deterministicGap.Matches.Count(m => m.IsRequired);
+        var totalRequired = jdResult.Value.RequiredSkills.Count;
+        var missingRequiredNames = deterministicGap.MissingRequired.Select(skill => skill.SkillName).ToArray();
+        var missingRequiredText = missingRequiredNames.Length > 0
+            ? string.Join(", ", missingRequiredNames)
+            : "<none>";
+        _logger.LogInformation(
+            "Deterministic matcher results: {MatchCount} matches ({RequiredMatches}/{RequiredTotal} required) in {ElapsedMs}ms; missing required qualities: {MissingRequired}",
+            deterministicGap.Matches.Count,
+            requiredMatches,
+            totalRequired,
+            deterministicElapsedMs,
+            missingRequiredText);
         var gapResult = new LlmResult<GapAnalysis>
         {
             Value = deterministicGap,

@@ -75,7 +75,9 @@ public class OpenAiClient : ILlmClient
             if (!parseSuccess)
             {
                 repairAttempted = true;
-                _logger.LogWarning("Initial structured parse failed. Attempting one JSON repair pass.");
+                _logger.LogWarning(
+                    "Initial structured parse failed. Attempting one JSON repair pass. Initial response snippet: {Snippet}",
+                    FormatSnippet(content));
 
                 var repairMessages = new List<ChatMessage>
                 {
@@ -109,6 +111,9 @@ public class OpenAiClient : ILlmClient
 
                 if (!parseSuccess || value is null)
                 {
+                    _logger.LogError(
+                        "Failed to parse structured output after repair attempt. Latest response snippet: {Snippet}",
+                        FormatSnippet(content));
                     throw new LlmException("Failed to parse structured output after repair attempt.");
                 }
             }
@@ -228,5 +233,18 @@ public class OpenAiClient : ILlmClient
             value = default;
             return false;
         }
+    }
+
+    private static string FormatSnippet(string content)
+    {
+        const int maxLength = 512;
+        if (string.IsNullOrEmpty(content))
+        {
+            return "<empty response>";
+        }
+
+        return content.Length <= maxLength
+            ? content
+            : content.Substring(0, maxLength) + "...";
     }
 }
