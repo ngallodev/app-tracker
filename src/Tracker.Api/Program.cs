@@ -108,7 +108,7 @@ file static class MigrationBootstrapper
 
         if (db.Database.IsSqlite())
         {
-            EnsureSupplementalTables(db);
+            EnsureSupplementalTables(db, logger);
         }
     }
 
@@ -231,8 +231,10 @@ file static class MigrationBootstrapper
         EnsureOpenAndExecuteNonQuery(command);
     }
 
-    private static void EnsureSupplementalTables(TrackerDbContext db)
+    private static void EnsureSupplementalTables(TrackerDbContext db, Microsoft.Extensions.Logging.ILogger logger)
     {
+        EnsureLegacyColumns(db, logger);
+
         ExecuteNonQuery(
             db,
             """
@@ -251,7 +253,39 @@ file static class MigrationBootstrapper
                 "CreatedAt" TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS "IX_eval_runs_CreatedAt" ON "eval_runs" ("CreatedAt");
+
+            CREATE TABLE IF NOT EXISTS "analysis_request_metrics" (
+                "Id" TEXT NOT NULL CONSTRAINT "PK_analysis_request_metrics" PRIMARY KEY,
+                "JobId" TEXT NOT NULL,
+                "ResumeId" TEXT NOT NULL,
+                "JobHash" TEXT NOT NULL,
+                "ResumeHash" TEXT NOT NULL,
+                "CacheHit" INTEGER NOT NULL,
+                "RequestMode" TEXT NOT NULL,
+                "Outcome" TEXT NOT NULL,
+                "UsedGapLlmFallback" INTEGER NOT NULL,
+                "InputTokens" INTEGER NOT NULL,
+                "OutputTokens" INTEGER NOT NULL,
+                "LatencyMs" INTEGER NOT NULL,
+                "Provider" TEXT NULL,
+                "ErrorCategory" TEXT NULL,
+                "CreatedAt" TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_analysis_request_metrics_CreatedAt" ON "analysis_request_metrics" ("CreatedAt");
+            CREATE INDEX IF NOT EXISTS "IX_analysis_request_metrics_JobHash" ON "analysis_request_metrics" ("JobHash");
+            CREATE INDEX IF NOT EXISTS "IX_analysis_request_metrics_RequestMode" ON "analysis_request_metrics" ("RequestMode");
+            CREATE INDEX IF NOT EXISTS "IX_analysis_request_metrics_CacheHit" ON "analysis_request_metrics" ("CacheHit");
             """);
+    }
+
+    private static void EnsureLegacyColumns(TrackerDbContext db, Microsoft.Extensions.Logging.ILogger logger)
+    {
+        if (!ColumnExists(db, "analyses", "ErrorMessage"))
+        {
+            logger.LogWarning(
+                "Legacy SQLite schema missing analyses.ErrorMessage column. Applying compatibility column patch.");
+            ExecuteNonQuery(db, "ALTER TABLE \"analyses\" ADD COLUMN \"ErrorMessage\" TEXT NULL;");
+        }
     }
 
     private static long EnsureOpenAndExecuteScalarInt64(IDbCommand command)

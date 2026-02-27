@@ -13,6 +13,7 @@ public class TrackerDbContext : DbContext
     public DbSet<AnalysisResult> AnalysisResults => Set<AnalysisResult>();
     public DbSet<LlmLog> LlmLogs => Set<LlmLog>();
     public DbSet<EvalRun> EvalRuns => Set<EvalRun>();
+    public DbSet<AnalysisRequestMetric> AnalysisRequestMetrics => Set<AnalysisRequestMetric>();
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -124,6 +125,32 @@ public class TrackerDbContext : DbContext
             entity.Property(e => e.ResultsJson).IsRequired();
             entity.Property(e => e.CreatedAt).IsRequired();
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        modelBuilder.Entity<AnalysisRequestMetric>(entity =>
+        {
+            entity.ToTable("analysis_request_metrics");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasDefaultValueSql("newid()");
+            entity.Property(e => e.JobId).IsRequired();
+            entity.Property(e => e.ResumeId).IsRequired();
+            entity.Property(e => e.JobHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.ResumeHash).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.CacheHit).IsRequired();
+            entity.Property(e => e.RequestMode).IsRequired().HasMaxLength(32);
+            entity.Property(e => e.Outcome).IsRequired().HasMaxLength(16);
+            entity.Property(e => e.UsedGapLlmFallback).IsRequired();
+            entity.Property(e => e.InputTokens).IsRequired();
+            entity.Property(e => e.OutputTokens).IsRequired();
+            entity.Property(e => e.LatencyMs).IsRequired();
+            entity.Property(e => e.Provider).HasMaxLength(64);
+            entity.Property(e => e.ErrorCategory).HasMaxLength(32);
+            entity.Property(e => e.CreatedAt).IsRequired();
+
+            entity.HasIndex(e => e.CreatedAt);
+            entity.HasIndex(e => e.JobHash);
+            entity.HasIndex(e => e.RequestMode);
+            entity.HasIndex(e => e.CacheHit);
         });
     }
 }

@@ -18,9 +18,13 @@ public static class EvalEndpoints
         {
             var runs = await db.EvalRuns
                 .AsNoTracking()
+                .ToListAsync(ct);
+
+            // SQLite provider cannot translate DateTimeOffset ORDER BY.
+            runs = runs
                 .OrderByDescending(x => x.CreatedAt)
                 .Take(20)
-                .ToListAsync(ct);
+                .ToList();
 
             return Results.Ok(runs.Select(x => new
             {
