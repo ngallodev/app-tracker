@@ -1,0 +1,40 @@
+{
+  "name": "mobile_ios_engineer",
+  "roleTitle": "Mobile iOS Engineer",
+  "seniorityLevel": "mid",
+  "requiredSkills": [
+    {
+      "skillName": "Swift",
+      "evidenceQuote": "Swift application development required",
+      "category": "technical"
+    },
+    {
+      "skillName": "iOS",
+      "evidenceQuote": "iOS platform expertise required",
+      "category": "platform"
+    },
+    {
+      "skillName": "Xcode",
+      "evidenceQuote": "Xcode debugging and profiling",
+      "category": "tool"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "GraphQL",
+      "evidenceQuote": "GraphQL client integration preferred",
+      "category": "technical"
+    },
+    {
+      "skillName": "CI/CD",
+      "evidenceQuote": "CI/CD release automation preferred",
+      "category": "process"
+    }
+  ],
+  "resumeText": "iOS developer building Swift applications in Xcode. Implemented GraphQL data fetching and CI/CD release pipelines.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 2
+  }
+}

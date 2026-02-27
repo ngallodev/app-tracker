@@ -1,0 +1,40 @@
+{
+  "name": "ml_engineer_applied",
+  "roleTitle": "Machine Learning Engineer",
+  "seniorityLevel": "senior",
+  "requiredSkills": [
+    {
+      "skillName": "Python",
+      "evidenceQuote": "Python model development required",
+      "category": "technical"
+    },
+    {
+      "skillName": "Machine Learning",
+      "evidenceQuote": "Machine learning model training required",
+      "category": "domain"
+    },
+    {
+      "skillName": "PostgreSQL",
+      "evidenceQuote": "PostgreSQL feature store management",
+      "category": "technical"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "Kubernetes",
+      "evidenceQuote": "Kubernetes model deployment preferred",
+      "category": "tool"
+    },
+    {
+      "skillName": "AWS",
+      "evidenceQuote": "AWS ML platform experience preferred",
+      "category": "cloud"
+    }
+  ],
+  "resumeText": "Machine learning engineer using Python for model training and evaluation. Managed features in postgres and deployed inference services to Kubernetes on AWS.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 2
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "data_engineer_pipeline",
+  "roleTitle": "Data Engineer",
+  "seniorityLevel": "mid",
+  "requiredSkills": [
+    {
+      "skillName": "Python",
+      "evidenceQuote": "Strong Python skills for data processing",
+      "category": "technical"
+    },
+    {
+      "skillName": "SQL",
+      "evidenceQuote": "Advanced SQL query development",
+      "category": "technical"
+    },
+    {
+      "skillName": "Airflow",
+      "evidenceQuote": "Experience with Airflow scheduling",
+      "category": "tool"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "AWS",
+      "evidenceQuote": "AWS data platform exposure",
+      "category": "cloud"
+    },
+    {
+      "skillName": "Kafka",
+      "evidenceQuote": "Kafka streaming experience",
+      "category": "tool"
+    }
+  ],
+  "resumeText": "Data engineer building Python ETL pipelines with SQL transformations and Airflow orchestration. Deployed jobs on AWS.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 1
+  }
+}

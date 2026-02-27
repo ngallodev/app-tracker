@@ -1,0 +1,40 @@
+{
+  "name": "security_response_engineer",
+  "roleTitle": "Security Response Engineer",
+  "seniorityLevel": "senior",
+  "requiredSkills": [
+    {
+      "skillName": "SIEM",
+      "evidenceQuote": "Operate SIEM detection workflows",
+      "category": "security"
+    },
+    {
+      "skillName": "Incident Response",
+      "evidenceQuote": "Lead incident response and triage",
+      "category": "security"
+    },
+    {
+      "skillName": "Python",
+      "evidenceQuote": "Python scripting for automation",
+      "category": "technical"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "AWS",
+      "evidenceQuote": "AWS cloud security familiarity",
+      "category": "cloud"
+    },
+    {
+      "skillName": "Splunk",
+      "evidenceQuote": "Splunk query optimization",
+      "category": "tool"
+    }
+  ],
+  "resumeText": "Security engineer running SIEM detections and handling incident response playbooks. Built Python automations and investigated AWS and Splunk telemetry.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 2
+  }
+}

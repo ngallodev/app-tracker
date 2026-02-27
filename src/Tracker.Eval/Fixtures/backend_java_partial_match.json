@@ -1,0 +1,35 @@
+{
+  "name": "backend_java_partial_match",
+  "roleTitle": "Backend Java Engineer",
+  "seniorityLevel": "mid",
+  "requiredSkills": [
+    {
+      "skillName": "Java",
+      "evidenceQuote": "Java services development required",
+      "category": "technical"
+    },
+    {
+      "skillName": "Spring",
+      "evidenceQuote": "Spring framework experience required",
+      "category": "framework"
+    },
+    {
+      "skillName": "SQL",
+      "evidenceQuote": "SQL optimization experience required",
+      "category": "technical"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "Docker",
+      "evidenceQuote": "Docker containerization preferred",
+      "category": "tool"
+    }
+  ],
+  "resumeText": "Backend engineer building Java microservices with Spring Boot APIs. Deploys through Docker images.",
+  "expectations": {
+    "minRequiredMatches": 2,
+    "maxMissingRequired": 1,
+    "minPreferredMatches": 1
+  }
+}

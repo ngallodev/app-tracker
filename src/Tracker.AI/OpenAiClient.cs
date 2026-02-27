@@ -79,26 +79,33 @@ public class OpenAiClient : ILlmClient
                     "Initial structured parse failed. Attempting one JSON repair pass. Initial response snippet: {Snippet}",
                     FormatSnippet(content));
 
-                var repairMessages = new List<ChatMessage>
+                totalInputTokens += completion.Value.Usage.InputTokenCount;
+                totalOutputTokens += completion.Value.Usage.OutputTokenCount;
+
+                var parseSuccess = TryDeserialize<T>(content, out var value);
+                initialParseSuccess = parseSuccess;
+
+                if (!parseSuccess)
                 {
-                    new SystemChatMessage("""
-                        You repair JSON outputs. Return ONLY valid JSON.
-                        Do not include markdown, prose, comments, or code fences.
-                        Preserve the intended schema and snake_case keys.
-                        """),
-                    new UserChatMessage($"""
-                        Original system prompt:
-                        {systemPrompt}
+                    repairAttempted = true;
+                    _logger.LogWarning("Initial structured parse failed. Attempting one JSON repair pass.");
 
-                        Original user prompt:
-                        {userPrompt}
+                    var repairMessages = new List<ChatMessage>
+                    {
+                        new SystemChatMessage("""
+                            You repair JSON outputs. Return ONLY valid JSON.
+                            Do not include markdown, prose, comments, or code fences.
+                            Preserve the intended schema and snake_case keys.
+                            """),
+                        new UserChatMessage($"""
+                            Original system prompt:
+                            {systemPrompt}
 
-                        Invalid JSON output:
-                        {content}
+                            Original user prompt:
+                            {userPrompt}
 
-                        Return corrected JSON only.
-                        """)
-                };
+                            Invalid JSON output:
+                            {content}
 
                 var repairCompletion = await _resiliencePolicy.ExecuteAsync(async ct =>
                     await _client.GetChatClient(_chatModel).CompleteChatAsync(repairMessages, options, ct),
@@ -107,7 +114,11 @@ public class OpenAiClient : ILlmClient
                 totalInputTokens += repairCompletion.Value.Usage.InputTokenCount;
                 totalOutputTokens += repairCompletion.Value.Usage.OutputTokenCount;
 
-                parseSuccess = TryDeserialize<T>(content, out value);
+                    var repairCompletion = await _client.GetChatClient(_chatModel)
+                        .CompleteChatAsync(repairMessages, options, ct);
+                    content = ExtractContent(repairCompletion.Value);
+                    totalInputTokens += repairCompletion.Value.Usage.InputTokenCount;
+                    totalOutputTokens += repairCompletion.Value.Usage.OutputTokenCount;
 
                 if (!parseSuccess || value is null)
                 {
@@ -116,14 +127,10 @@ public class OpenAiClient : ILlmClient
                         FormatSnippet(content));
                     throw new LlmException("Failed to parse structured output after repair attempt.");
                 }
-            }
 
-            sw.Stop();
+                sw.Stop();
 
-            return new LlmResult<T>
-            {
-                Value = value!,
-                Usage = new LlmUsage
+                return new LlmResult<T>
                 {
                     InputTokens = totalInputTokens,
                     OutputTokens = totalOutputTokens
@@ -248,3 +255,4 @@ public class OpenAiClient : ILlmClient
             : content.Substring(0, maxLength) + "...";
     }
 }
+    
