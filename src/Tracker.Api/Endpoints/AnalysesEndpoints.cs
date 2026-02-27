@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using System.Text.Json;
 using Tracker.AI;
 using Tracker.AI.Cli;
@@ -17,6 +18,10 @@ public static class AnalysesEndpoints
 {
     private const string DeterministicMode = "deterministic";
     private const string LlmFallbackMode = "llm_fallback";
+    private const string CachedMode = "cached";
+    private const string FailedMode = "failed";
+    private const string CompletedOutcome = "completed";
+    private const string FailedOutcome = "failed";
 
     private static AnalysisResultDto ToDto(Analysis analysis)
     {
@@ -117,6 +122,62 @@ public static class AnalysesEndpoints
         return provider == "unknown" ? "unknown" : "cli_headless";
     }
 
+    private static AnalysisRequestMetric CreateRequestMetric(
+        Guid jobId,
+        Guid resumeId,
+        string jobHash,
+        string resumeHash,
+        bool cacheHit,
+        string requestMode,
+        string outcome,
+        bool usedGapLlmFallback,
+        int inputTokens,
+        int outputTokens,
+        int latencyMs,
+        string? provider,
+        string? errorCategory = null)
+    {
+        return new AnalysisRequestMetric
+        {
+            Id = Guid.NewGuid(),
+            JobId = jobId,
+            ResumeId = resumeId,
+            JobHash = jobHash,
+            ResumeHash = resumeHash,
+            CacheHit = cacheHit,
+            RequestMode = requestMode,
+            Outcome = outcome,
+            UsedGapLlmFallback = usedGapLlmFallback,
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            LatencyMs = latencyMs,
+            Provider = provider,
+            ErrorCategory = errorCategory,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    private static decimal Percent(int numerator, int denominator)
+        => denominator == 0 ? 0m : Math.Round((decimal)numerator / denominator * 100m, 2);
+
+    private static decimal AverageTokens(IReadOnlyCollection<AnalysisRequestMetric> metrics)
+        => metrics.Count == 0
+            ? 0m
+            : Math.Round((decimal)metrics.Average(m => m.InputTokens + m.OutputTokens), 2);
+
+    private static int P95LatencyMs(IReadOnlyCollection<AnalysisRequestMetric> metrics)
+    {
+        if (metrics.Count == 0)
+        {
+            return 0;
+        }
+
+        var ordered = metrics.Select(x => x.LatencyMs).OrderBy(x => x).ToList();
+        var rank = (int)Math.Ceiling(ordered.Count * 0.95m);
+        rank = Math.Clamp(rank, 1, ordered.Count);
+        return ordered[rank - 1];
+    }
+
     public static IEndpointRouteBuilder MapAnalysisEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/analyses");
@@ -137,6 +198,98 @@ public static class AnalysesEndpoints
             return Results.Ok(result);
         })
         .WithName("GetAllAnalyses");
+
+        // GET /api/analyses/metrics
+        group.MapGet("/metrics", async (TrackerDbContext db, CancellationToken ct) =>
+        {
+            var requestMetrics = await db.AnalysisRequestMetrics
+                .AsNoTracking()
+                .ToListAsync(ct);
+
+            var completed = requestMetrics
+                .Where(x => string.Equals(x.Outcome, CompletedOutcome, StringComparison.Ordinal))
+                .ToList();
+            var uncachedCompleted = completed.Where(x => !x.CacheHit).ToList();
+            var cachedCompleted = completed.Where(x => x.CacheHit).ToList();
+            var deterministicCompleted = uncachedCompleted
+                .Where(x => string.Equals(x.RequestMode, DeterministicMode, StringComparison.Ordinal))
+                .ToList();
+            var fallbackCompleted = uncachedCompleted
+                .Where(x => string.Equals(x.RequestMode, LlmFallbackMode, StringComparison.Ordinal))
+                .ToList();
+
+            var repeatedJdRequests = 0;
+            var repeatedJdCacheHits = 0;
+            foreach (var groupByJd in requestMetrics
+                .Where(x => !string.IsNullOrWhiteSpace(x.JobHash))
+                .GroupBy(x => x.JobHash))
+            {
+                var ordered = groupByJd.OrderBy(x => x.CreatedAt).ToList();
+                if (ordered.Count < 2)
+                {
+                    continue;
+                }
+
+                var repeatedEntries = ordered.Skip(1).ToList();
+                repeatedJdRequests += repeatedEntries.Count;
+                repeatedJdCacheHits += repeatedEntries.Count(x => x.CacheHit);
+            }
+
+            var deterministicResolutionRate = Percent(deterministicCompleted.Count, uncachedCompleted.Count);
+            var cacheHitRateOverall = Percent(cachedCompleted.Count, completed.Count);
+            var cacheHitRateRepeatedJds = Percent(repeatedJdCacheHits, repeatedJdRequests);
+            var avgTokensPerRequest = AverageTokens(completed);
+            var fallbackAvgTokens = AverageTokens(fallbackCompleted);
+            var deterministicAvgTokens = AverageTokens(deterministicCompleted);
+
+            var latestEvalRun = await db.EvalRuns
+                .AsNoTracking()
+                .ToListAsync(ct);
+            var latestDeterministicEval = latestEvalRun
+                .Where(x => string.Equals(x.Mode, "deterministic", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefault();
+
+            var evalFixtureCount = latestDeterministicEval?.FixtureCount ?? 0;
+            var evalPassRate = latestDeterministicEval is null || latestDeterministicEval.FixtureCount == 0
+                ? 0m
+                : Math.Round((decimal)latestDeterministicEval.PassedCount / latestDeterministicEval.FixtureCount * 100m, 2);
+
+            return Results.Ok(new
+            {
+                totals = new
+                {
+                    totalRequests = requestMetrics.Count,
+                    completedRequests = completed.Count,
+                    uncachedCompletedRequests = uncachedCompleted.Count,
+                    cachedCompletedRequests = cachedCompleted.Count,
+                    fallbackCompletedRequests = fallbackCompleted.Count
+                },
+                metrics = new
+                {
+                    deterministicResolutionRatePct = deterministicResolutionRate,
+                    averageTokensPerRequest = avgTokensPerRequest,
+                    fallbackAverageTokensPerRequest = fallbackAvgTokens,
+                    deterministicAverageTokensPerRequest = deterministicAvgTokens,
+                    cacheHitRateOverallPct = cacheHitRateOverall,
+                    cacheHitRateOnRepeatedJdsPct = cacheHitRateRepeatedJds,
+                    p95LatencyMs = new
+                    {
+                        coldDeterministic = P95LatencyMs(deterministicCompleted),
+                        fallbackLlm = P95LatencyMs(fallbackCompleted),
+                        cached = P95LatencyMs(cachedCompleted)
+                    }
+                },
+                resumeBullets = new[]
+                {
+                    $"Deterministic-first matching resolved {deterministicResolutionRate}% of uncached completed requests without LLM fallback, reducing inference cost.",
+                    $"Content-hash caching eliminated {cacheHitRateRepeatedJds}% of redundant requests on repeated job descriptions.",
+                    $"Achieved {evalPassRate}% reproducibility across {evalFixtureCount} fixture-based eval cases (latest deterministic eval run).",
+                    $"Average token usage per completed request: deterministic {deterministicAvgTokens} tokens vs fallback {fallbackAvgTokens} tokens."
+                }
+            });
+        })
+        .WithName("GetAnalysisMetrics");
         
         // GET /api/analyses/{id}
         group.MapGet("/{id:guid}", async (Guid id, TrackerDbContext db, CancellationToken ct) =>
@@ -182,8 +335,12 @@ public static class AnalysesEndpoints
             CreateAnalysisRequest request,
             TrackerDbContext db,
             IAnalysisService analysisService,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
+            var logger = loggerFactory.CreateLogger("AnalysisRequests");
+            var requestStopwatch = Stopwatch.StartNew();
+
             // Verify job and resume exist
             var job = await db.Jobs.FindAsync([request.JobId], ct);
             if (job is null)
@@ -259,7 +416,7 @@ public static class AnalysesEndpoints
             }
 
             // Hash-pair cache: reuse latest completed analysis for identical JD/resume content.
-            var cachedAnalysis = await db.Analyses
+            var cachedCandidates = await db.Analyses
                 .AsNoTracking()
                 .Include(a => a.Result)
                 .Include(a => a.Job)
@@ -270,11 +427,38 @@ public static class AnalysesEndpoints
                     a.Result != null &&
                     a.Job.DescriptionHash == jobHash &&
                     a.Resume.ContentHash == resumeHash)
+                .ToListAsync(ct);
+
+            // SQLite provider cannot translate DateTimeOffset ORDER BY; pick latest in-memory.
+            var cachedAnalysis = cachedCandidates
                 .OrderByDescending(a => a.CreatedAt)
-                .FirstOrDefaultAsync(ct);
+                .FirstOrDefault();
 
             if (cachedAnalysis is not null)
             {
+                requestStopwatch.Stop();
+                var (cachedGapMode, cachedUsedFallback) = ResolveGapAnalysisMode(cachedAnalysis);
+                db.AnalysisRequestMetrics.Add(CreateRequestMetric(
+                    request.JobId,
+                    request.ResumeId,
+                    jobHash,
+                    resumeHash,
+                    cacheHit: true,
+                    requestMode: CachedMode,
+                    outcome: CompletedOutcome,
+                    usedGapLlmFallback: cachedUsedFallback,
+                    inputTokens: 0,
+                    outputTokens: 0,
+                    latencyMs: (int)requestStopwatch.ElapsedMilliseconds,
+                    provider: ResolveProvider(cachedAnalysis)));
+                await db.SaveChangesAsync(ct);
+
+                logger.LogInformation(
+                    "Analysis request served from cache. JobId={JobId}, ResumeId={ResumeId}, GapMode={GapMode}, LatencyMs={LatencyMs}",
+                    request.JobId,
+                    request.ResumeId,
+                    cachedGapMode,
+                    requestStopwatch.ElapsedMilliseconds);
                 return Results.Ok(ToDto(cachedAnalysis));
             }
             
@@ -356,8 +540,35 @@ public static class AnalysesEndpoints
                     RepairAttempted = false,
                     CreatedAt = DateTimeOffset.UtcNow
                 });
+
+                requestStopwatch.Stop();
+                var requestMode = result.Metadata.UsedGapLlmFallback
+                    ? LlmFallbackMode
+                    : DeterministicMode;
+                db.AnalysisRequestMetrics.Add(CreateRequestMetric(
+                    request.JobId,
+                    request.ResumeId,
+                    jobHash,
+                    resumeHash,
+                    cacheHit: false,
+                    requestMode: requestMode,
+                    outcome: CompletedOutcome,
+                    usedGapLlmFallback: result.Metadata.UsedGapLlmFallback,
+                    inputTokens: result.Metadata.TotalInputTokens,
+                    outputTokens: result.Metadata.TotalOutputTokens,
+                    latencyMs: (int)requestStopwatch.ElapsedMilliseconds,
+                    provider: result.Metadata.Provider));
                 
                 await db.SaveChangesAsync(ct);
+
+                logger.LogInformation(
+                    "Analysis request completed. JobId={JobId}, ResumeId={ResumeId}, RequestMode={RequestMode}, InputTokens={InputTokens}, OutputTokens={OutputTokens}, LatencyMs={LatencyMs}",
+                    request.JobId,
+                    request.ResumeId,
+                    requestMode,
+                    result.Metadata.TotalInputTokens,
+                    result.Metadata.TotalOutputTokens,
+                    requestStopwatch.ElapsedMilliseconds);
                 
                 return Results.Created(
                     $"/api/analyses/{analysis.Id}",
@@ -370,9 +581,31 @@ public static class AnalysesEndpoints
             }
             catch (LlmException llmEx)
             {
+                requestStopwatch.Stop();
                 analysis.Status = AnalysisStatus.Failed;
                 analysis.ErrorMessage = llmEx.Message;
+                db.AnalysisRequestMetrics.Add(CreateRequestMetric(
+                    request.JobId,
+                    request.ResumeId,
+                    jobHash,
+                    resumeHash,
+                    cacheHit: false,
+                    requestMode: FailedMode,
+                    outcome: FailedOutcome,
+                    usedGapLlmFallback: false,
+                    inputTokens: analysis.InputTokens,
+                    outputTokens: analysis.OutputTokens,
+                    latencyMs: (int)requestStopwatch.ElapsedMilliseconds,
+                    provider: request.Provider,
+                    errorCategory: "llm"));
                 await db.SaveChangesAsync(ct);
+                logger.LogWarning(
+                    "Analysis request failed with LLM error. JobId={JobId}, ResumeId={ResumeId}, Provider={Provider}, LatencyMs={LatencyMs}, StatusCode={StatusCode}",
+                    request.JobId,
+                    request.ResumeId,
+                    request.Provider,
+                    requestStopwatch.ElapsedMilliseconds,
+                    llmEx.StatusCode);
                 return Results.Problem(
                     detail: llmEx.Message,
                     statusCode: llmEx.StatusCode ?? 502,
@@ -380,9 +613,31 @@ public static class AnalysesEndpoints
             }
             catch (Exception ex)
             {
+                requestStopwatch.Stop();
                 analysis.Status = AnalysisStatus.Failed;
                 analysis.ErrorMessage = ex.Message;
+                db.AnalysisRequestMetrics.Add(CreateRequestMetric(
+                    request.JobId,
+                    request.ResumeId,
+                    jobHash,
+                    resumeHash,
+                    cacheHit: false,
+                    requestMode: FailedMode,
+                    outcome: FailedOutcome,
+                    usedGapLlmFallback: false,
+                    inputTokens: analysis.InputTokens,
+                    outputTokens: analysis.OutputTokens,
+                    latencyMs: (int)requestStopwatch.ElapsedMilliseconds,
+                    provider: request.Provider,
+                    errorCategory: "unhandled"));
                 await db.SaveChangesAsync(ct);
+                logger.LogError(
+                    ex,
+                    "Analysis request failed unexpectedly. JobId={JobId}, ResumeId={ResumeId}, Provider={Provider}, LatencyMs={LatencyMs}",
+                    request.JobId,
+                    request.ResumeId,
+                    request.Provider,
+                    requestStopwatch.ElapsedMilliseconds);
                 return Results.Problem(
                     detail: ex.Message,
                     statusCode: 500,
