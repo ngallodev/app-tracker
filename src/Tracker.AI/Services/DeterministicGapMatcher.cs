@@ -9,6 +9,8 @@ public static class DeterministicGapMatcher
     {
         ["javascript"] = ["js", "ecmascript", "node.js", "nodejs"],
         ["typescript"] = ["ts"],
+        ["node.js"] = ["nodejs", "node js"],
+        ["nodejs"] = ["node.js", "node js"],
         ["c#"] = ["csharp", "dotnet", ".net"],
         ["kubernetes"] = ["k8s"],
         ["postgresql"] = ["postgres", "psql"],
@@ -133,12 +135,10 @@ public static class DeterministicGapMatcher
             return false;
         }
 
-        if (searchTerm.Contains(' '))
-        {
-            return normalizedResume.Contains(searchTerm, StringComparison.Ordinal);
-        }
-
-        return Regex.IsMatch(normalizedResume, $@"\b{Regex.Escape(searchTerm)}\b");
+        return Regex.IsMatch(
+            normalizedResume,
+            $@"(?<![a-z0-9]){Regex.Escape(searchTerm)}(?![a-z0-9])",
+            RegexOptions.CultureInvariant);
     }
 
     private static string ExtractResumeEvidence(string resumeText, string matchedTerm)

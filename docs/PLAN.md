@@ -451,9 +451,9 @@ Set OPENAI_API_KEY environment variable to enable real LLM calls.
 
 These optimized breakdowns are intended for efficient multi-agent assignment and lower token/cost overhead:
 
-- Day 3 optimized breakdown: `docs/day-3-tasks.md` (see "Day 3 Optimization Addendum")
-- Day 4 optimized breakdown: `docs/day-4-tasks.md`
-- Day 5 optimized breakdown: `docs/day-5-tasks.md` (see "Day 5 Optimization Addendum")
+- Day 3 optimized breakdown: `docs/archive-ignore/planning/day-3-tasks.md` (see "Day 3 Optimization Addendum")
+- Day 4 optimized breakdown: `docs/archive-ignore/planning/day-4-tasks.md`
+- Day 5 optimized breakdown: `docs/archive-ignore/planning/day-5-tasks.md` (see "Day 5 Optimization Addendum")
 
 ### Agent and model guidance
 - `explorer` agent: discovery, code search, validation checks, docs consistency checks.  

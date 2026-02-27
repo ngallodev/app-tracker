@@ -21,8 +21,8 @@ start_epoch_ms="$(date +%s%3N)"
 start_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 set +e
-"$@" > >(tee "${log_file}") 2>&1
-exit_code=$?
+"$@" 2>&1 | tee "${log_file}"
+exit_code=${PIPESTATUS[0]}
 set -e
 
 end_epoch_ms="$(date +%s%3N)"
