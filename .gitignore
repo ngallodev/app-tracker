@@ -59,6 +59,6 @@ packages/
 *.snupkg
 
 # Node.js
-node_modules/
+*/node_modules/
 app/
 .fake
