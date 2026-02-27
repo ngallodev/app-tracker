@@ -129,3 +129,34 @@ Signed-off-by: codex gpt-5
 - Analysis creation still returns provider-level 502 in this environment (`claude` invalid structured output after repair), but application startup and baseline runtime health are restored.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 5 — 2026-02-27 — codex gpt-5
+
+**Branch:** main
+**Commit scope:** Stabilize deterministic eval CI stage, fix matcher drift, and archive legacy planning docs into single-workboard model
+
+### Changes
+- `scripts/ci_stage.sh`: Replaced process-substitution logging with pipe+`tee` and `PIPESTATUS` capture to avoid Jenkins stage hang/spin after child failure.
+- `scripts/run_deterministic_eval.sh`:
+  - Added deterministic runner artifact outputs in `artifacts/`.
+  - Added stable `dotnet build -m:1` prebuild and `dotnet run --no-build` execution path.
+  - Added JSON summary generation (`artifacts/deterministic-eval-summary.json`) including resume-ready bullets.
+- `src/Tracker.AI/Services/DeterministicGapMatcher.cs`:
+  - Fixed token-boundary detection for symbol skills (e.g., `C#`).
+  - Added Node.js/nodejs synonym coverage for preferred-skill matching parity.
+  - Result: deterministic eval now passes all fixtures.
+- Archived legacy planning/review/root-note docs into `docs/archive-ignore/`.
+- Added `docs/WORKBOARD.md` as canonical source of truth for active architecture pointers, TODOs, and delivery tickets.
+- Updated `README.md` and `docs/PLAN.md` references to align with new archive/workboard structure.
+
+### Build Notes
+- `./scripts/ci_stage.sh deterministic_eval ./scripts/run_deterministic_eval.sh` now exits cleanly and no longer hangs.
+- Deterministic eval result: `Fixtures: 10, Passed: 10, Failed: 0`.
+- `artifacts/deterministic-eval-summary.json` generated with `passRatePercent: 100.0`.
+
+### Issues Encountered
+- .NET SDK 10.0.103 exhibited intermittent parallel-build behavior for `Tracker.Eval` in CI context; single-node prebuild (`-m:1`) produced stable execution.
+
+Signed-off-by: codex gpt-5

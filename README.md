@@ -200,8 +200,8 @@ Bookmarklet tooling is included to capture and clean JD text locally before subm
 
 ## Important Repository Notes
 
-- Planning docs and day-by-day execution breakdowns are in `docs/`.
-- Multi-agent task packs/checklists are in `docs/review-checklists/`.
+- Active plan/tickets source of truth: `docs/WORKBOARD.md`
+- Archived planning and handoff notes: `docs/archive-ignore/`
 - `.dev-report-cache.md` is intentionally ignored.
 
 ## Roadmap (High-Level)
@@ -214,9 +214,9 @@ Near-term planned work includes:
 
 ## Footnotes: Current TODOs and Next Steps
 
-- Frontend in `web/src/App.tsx` now supports create/delete jobs and resumes, running analyses, viewing analysis metrics/skills, and deterministic eval run/history; remaining UI gaps are edit/update flows and dedicated routed pages.
-- Reliability and observability hardening remain active implementation targets per `docs/day-4-tasks.md`, especially aligning runtime resilience behavior for CLI-provider execution with the original Polly-focused design intent.
-- Day 5 documentation artifacts are now available in `docs/architecture.md`, `docs/demo-script.md`, and `docs/portfolio-case-study.md`; production deployment execution remains a follow-on task.
+- Canonical active TODOs/tickets are tracked in `docs/WORKBOARD.md`.
+- Day 5 documentation artifacts are available in `docs/architecture.md`, `docs/demo-script.md`, and `docs/portfolio-case-study.md`.
+- Historical planning notes are preserved in `docs/archive-ignore/planning/`.
 
 ---
 
