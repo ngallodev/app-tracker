@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Tracker.Api.Endpoints;
@@ -111,6 +112,8 @@ app.MapEvalEndpoints();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<TrackerDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
+    MigrationBootstrapper.ApplyMigrationsWithLegacySqliteSupport(db, logger);
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseStartup");
     MigrationBootstrapper.ApplyMigrationsWithLegacySqliteSupport(db, logger);
 }
