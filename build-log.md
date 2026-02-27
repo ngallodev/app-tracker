@@ -108,3 +108,24 @@ Signed-off-by: opencode-kimi-k2.5-free
 - Additional CLI providers beyond `claude` are currently unavailable in PATH in this environment and report as unavailable via health checks.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 4 — 2026-02-27 — codex gpt-5
+
+**Branch:** main
+**Commit scope:** Emergency recovery of broken build after commit-cleanup reset
+
+### Changes
+- `src/Tracker.AI/OpenAiClient.cs`: Restored a known-good implementation from commit `f5b0224` and retained the structured-output repair/error-snippet logging path without malformed merge fragments.
+- `src/Tracker.Api/Program.cs`: Removed duplicated `using System.Data` and duplicate startup migration logger/migration invocation introduced by merge artifacts.
+
+### Build Notes
+- `dotnet build Tracker.slnx -v minimal` succeeded after recovery.
+- `cd web && npm run build` succeeded.
+- `./scripts/proof_of_life.sh` completed with API/UI liveness checks passing (`/healthz`, `/api/analyses`, and frontend root all 200).
+
+### Issues Encountered
+- Analysis creation still returns provider-level 502 in this environment (`claude` invalid structured output after repair), but application startup and baseline runtime health are restored.
+
+Signed-off-by: codex gpt-5
