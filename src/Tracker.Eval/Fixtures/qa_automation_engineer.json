@@ -1,0 +1,40 @@
+{
+  "name": "qa_automation_engineer",
+  "roleTitle": "QA Automation Engineer",
+  "seniorityLevel": "mid",
+  "requiredSkills": [
+    {
+      "skillName": "Selenium",
+      "evidenceQuote": "Selenium automation framework experience",
+      "category": "tool"
+    },
+    {
+      "skillName": "C#",
+      "evidenceQuote": "C# test framework development",
+      "category": "technical"
+    },
+    {
+      "skillName": "API Testing",
+      "evidenceQuote": "Hands-on API testing for backend services",
+      "category": "testing"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "Playwright",
+      "evidenceQuote": "Playwright browser automation preferred",
+      "category": "tool"
+    },
+    {
+      "skillName": "SQL",
+      "evidenceQuote": "SQL validation for test data",
+      "category": "technical"
+    }
+  ],
+  "resumeText": "QA engineer writing Selenium suites in C# and building API testing coverage. Added Playwright checks and SQL assertions for integration tests.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 2
+  }
+}

@@ -52,6 +52,32 @@ app.UseCorrelationId();
 app.UseSecurityHeaders();
 app.UseInputValidation();
 app.UseRateLimiter();
+app.UseStatusCodePages(async statusCodeContext =>
+{
+    var context = statusCodeContext.HttpContext;
+    if (context.Response.HasStarted ||
+        !string.IsNullOrWhiteSpace(context.Response.ContentType) ||
+        context.Response.ContentLength.GetValueOrDefault() > 0)
+    {
+        return;
+    }
+
+    var (title, detail, type) = context.Response.StatusCode switch
+    {
+        StatusCodes.Status400BadRequest => ("Bad Request", "The request could not be understood or was invalid.", "https://www.rfc-editor.org/rfc/rfc9110#section-15.5.1"),
+        StatusCodes.Status404NotFound => ("Not Found", "The requested resource was not found.", "https://www.rfc-editor.org/rfc/rfc9110#section-15.5.5"),
+        StatusCodes.Status429TooManyRequests => ("Too Many Requests", "Rate limit exceeded. Please try again later.", "https://www.rfc-editor.org/rfc/rfc6585#section-4"),
+        StatusCodes.Status500InternalServerError => ("Internal Server Error", "An unexpected server error occurred.", "https://www.rfc-editor.org/rfc/rfc9110#section-15.6.1"),
+        _ => (string.Empty, string.Empty, string.Empty)
+    };
+
+    if (string.IsNullOrWhiteSpace(title))
+    {
+        return;
+    }
+
+    await context.WriteProblemDetailsAsync(context.Response.StatusCode, title, detail, type);
+});
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

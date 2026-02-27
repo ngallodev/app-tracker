@@ -1,0 +1,35 @@
+{
+  "name": "frontend_vue_partial_match",
+  "roleTitle": "Frontend Vue Engineer",
+  "seniorityLevel": "mid",
+  "requiredSkills": [
+    {
+      "skillName": "JavaScript",
+      "evidenceQuote": "JavaScript fundamentals required",
+      "category": "technical"
+    },
+    {
+      "skillName": "TypeScript",
+      "evidenceQuote": "TypeScript production usage required",
+      "category": "technical"
+    },
+    {
+      "skillName": "Vue",
+      "evidenceQuote": "Vue application development required",
+      "category": "framework"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "Node.js",
+      "evidenceQuote": "Node.js tooling experience preferred",
+      "category": "technical"
+    }
+  ],
+  "resumeText": "Frontend engineer shipping Vue interfaces and modern JavaScript. Maintains nodejs build tooling and CI scripts.",
+  "expectations": {
+    "minRequiredMatches": 2,
+    "maxMissingRequired": 1,
+    "minPreferredMatches": 1
+  }
+}

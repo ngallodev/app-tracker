@@ -1,55 +1,50 @@
 # Fresh Start Checkpoint
 
-Generated: 2026-02-16 11:22
-Branch: feature/deterministic-first-matching
+Generated: 2026-02-16 20:59
+Branch: fmf-tryday3
 
-## Completed Work
+## Progress/Status
 
-### Core backend improvements
-- Added hash-pair cache reuse in analysis endpoint (`/api/analyses`) to avoid repeat LLM calls.
-- Hardened structured-output parsing with a one-pass JSON repair path before failing.
-- Persisted step-level LLM logs (`jd_extraction`, `gap_analysis_*`) with parse/repair metadata.
+### Day 3 status
+- Completed: analysis metadata contract + status endpoint.
+- Completed: deterministic eval fixtures expanded to 10 total (`src/Tracker.Eval/Fixtures/*.json`).
+- Completed: MVP frontend scaffold under `web/` with Jobs, Resumes, and Analysis pages.
 
-### Deterministic-first analysis path
-- Added deterministic skill gap matcher with synonym support.
-- Added low-confidence fallback to LLM gap analysis to balance cost and quality.
-- Exposed analysis mode metadata in API/DTO:
-  - `gapAnalysisMode`
-  - `usedGapLlmFallback`
+### Day 4 status
+- Completed: resilience policy layer for LLM calls (retry + timeout + circuit breaker) in:
+  - `src/Tracker.AI/PollyPolicies.cs`
+  - `src/Tracker.AI/OpenAiClient.cs`
+- Completed: correlation ID middleware and global RFC7807 problem details pipeline in:
+  - `src/Tracker.Api/Middleware/CorrelationIdMiddleware.cs`
+  - `src/Tracker.Api/Middleware/ExceptionMiddleware.cs`
+  - `src/Tracker.Api/Extensions/ProblemDetailsExtensions.cs`
+- Completed: dedicated health and readiness endpoints in:
+  - `src/Tracker.Api/Endpoints/HealthEndpoints.cs`
+- Completed: smoke test script:
+  - `scripts/day4_smoke.sh`
+- Completed: startup schema migration application (`Database.Migrate()`), replacing `EnsureCreated()`.
 
-### Cost-efficiency tooling/docs
-- Added bookmarklet workflow for local JD preprocessing:
-  - `docs/bookmarklet_jd_capture.js`
-  - `docs/BOOKMARKLET.md`
-- Added deterministic eval harness (fixture-based, low-cost):
-  - `src/Tracker.Eval/Program.cs`
-  - `src/Tracker.Eval/Fixtures/*.json`
-  - `scripts/run_deterministic_eval.sh`
-  - `docs/EVAL_DETERMINISTIC.md`
+### Day 5 status
+- Completed: deployment/container baseline:
+  - `Dockerfile`
+  - `.dockerignore`
+  - `docker-compose.yml`
+  - `fly.toml`
+- Completed: documentation and demo package:
+  - `README.md`
+  - `docs/architecture.md`
+  - `docs/portfolio-case-study.md`
+  - `docs/demo-script.md`
+  - `docs/pre-demo-checklist.md`
 
-### Planning/doc organization
-- Moved plan files into `docs/`.
-- Added `CLAUDE.md` with token-efficient build style.
-- Added symlink `AGENTS.md -> CLAUDE.md`.
-- Optimized uncompleted day breakdowns with agent/skill/model guidance:
-  - `docs/day-3-tasks.md` (optimization addendum)
-  - `docs/day-4-tasks.md` (new optimized breakdown)
-  - `docs/day-5-tasks.md` (optimization addendum)
-  - `docs/PLAN.md` (links + execution workflow section)
-
-## Commit History (latest first)
-- `68d8d3b` Add analysis mode metadata, deterministic eval runner, and optimized remaining-day plans
-- `6d59938` Add bookmarklet-based JD preprocessing workflow
-- `a04cd1b` Use deterministic gap matching with low-confidence LLM fallback
-- `c4c539d` Reorganize planning docs and add deterministic gap matcher
-- `1165431` Bootstrap app tracker and add analysis cache/repair logging
-
-## Current Working State
-- Repo is mostly clean on this branch.
-- Untracked files currently present at repo root:
-  - `day-3-tasks.md`
-  - `day-4-tasks.md`
-  - `day-5-tasks.md`
+## Validation Snapshot
+- Confirmed:
+  - `Tracker.AI` and `Tracker.Infrastructure` build in this environment.
+  - `docker compose config` parses successfully.
+  - `scripts/day4_smoke.sh` passes shell syntax check.
+- Blocked by environment:
+  - `Tracker.Api` build fails in SDK/MSBuild project-reference resolution stage with no emitted compiler diagnostics.
+  - Frontend install/build could not be fully executed due npm install limitations in this sandbox session.
 
 ## Notes
 - Local runtime verification is still partially blocked by environment/.NET SDK resolver behavior in this terminal context.

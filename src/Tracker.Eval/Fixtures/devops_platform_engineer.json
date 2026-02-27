@@ -1,0 +1,40 @@
+{
+  "name": "devops_platform_engineer",
+  "roleTitle": "DevOps Platform Engineer",
+  "seniorityLevel": "senior",
+  "requiredSkills": [
+    {
+      "skillName": "Kubernetes",
+      "evidenceQuote": "Operate Kubernetes production clusters",
+      "category": "tool"
+    },
+    {
+      "skillName": "Docker",
+      "evidenceQuote": "Containerize platform services with Docker",
+      "category": "tool"
+    },
+    {
+      "skillName": "Terraform",
+      "evidenceQuote": "Provision infrastructure through Terraform",
+      "category": "iac"
+    }
+  ],
+  "preferredSkills": [
+    {
+      "skillName": "AWS",
+      "evidenceQuote": "AWS operations experience preferred",
+      "category": "cloud"
+    },
+    {
+      "skillName": "Linux",
+      "evidenceQuote": "Linux administration experience",
+      "category": "technical"
+    }
+  ],
+  "resumeText": "Platform engineer managing k8s clusters, shipping services in Docker, and provisioning environments using Terraform. Daily AWS and Linux operations.",
+  "expectations": {
+    "minRequiredMatches": 3,
+    "maxMissingRequired": 0,
+    "minPreferredMatches": 2
+  }
+}

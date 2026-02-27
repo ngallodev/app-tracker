@@ -1,39 +1,42 @@
 # AI Job Application Tracker
 
-Deterministic-first job/resume analysis service with LLM-assisted extraction, fallback gap analysis, caching, and fixture-based evaluation.
+Backend API for comparing resumes to job descriptions with a deterministic-first analysis pipeline and LLM fallback when needed.
 
-## What This Project Does
+## Current Scope
 
-This backend helps compare a resume against a job description and returns:
-- coverage and groundedness scores
-- missing required/preferred skills
-- analysis mode metadata (`deterministic` vs `llm_fallback`)
-- token and latency metadata for traceability
+Implemented in this repository:
+- .NET 10 Minimal API backend (`src/Tracker.Api`)
+- SQLite persistence via EF Core (`src/Tracker.Infrastructure`)
+- Analysis pipeline (`src/Tracker.AI`):
+  - LLM-based JD extraction
+  - deterministic gap matching
+  - LLM fallback for gap analysis only when deterministic confidence is low
+- Hash-pair analysis caching for repeated JD/resume content
+- Fixture-based deterministic evaluation runner (`src/Tracker.Eval`)
 
 The current repository includes a .NET API backend, domain/infrastructure/AI projects, deterministic eval tooling, and a React/Vite frontend under `web/`.
 The frontend currently supports create/delete job+resume flows, running analyses, viewing analysis metrics/skills, and triggering/viewing deterministic eval runs.
 
-## Architecture
+## Analysis Behavior
 
-Solution projects:
-- `src/Tracker.Api`: Minimal API host and endpoint composition
-- `src/Tracker.AI`: LLM client, prompts, deterministic matcher, analysis orchestration
-- `src/Tracker.Domain`: Entities and DTOs
-- `src/Tracker.Infrastructure`: EF Core SQLite context + migrations + hash utilities
-- `src/Tracker.Eval`: deterministic fixture runner (no API key needed)
+`POST /api/analyses` flow:
+1. Validate request and load `job` + `resume`.
+2. Ensure normalized content hashes exist.
+3. Reuse latest completed cached analysis for same JD/resume hash pair.
+4. Run pipeline:
+   - JD extraction through `ILlmClient`
+   - deterministic gap matcher
+   - LLM fallback gap analysis only if `ShouldFallbackToLlm(...)` returns true
+5. Persist `analysis`, `analysis_results`, and step-level `llm_logs`.
+6. Return scores plus `gapAnalysisMode` (`deterministic` or `llm_fallback`).
 
-Core request flow (`POST /api/analyses`):
-1. Validate request and resolve `job` + `resume`.
-2. Normalize and hash JD/resume text.
-3. Reuse cached completed analysis for identical hash pair when available.
-4. Run analysis pipeline:
-   - JD extraction (`LLM`)
-   - Deterministic gap matching
-   - LLM fallback gap analysis only when confidence is low
-5. Persist `Analysis`, `AnalysisResult`, and step-level `LlmLog` records.
-6. Return structured result DTO with mode metadata.
+## Projects
 
-## Current API Surface
+- `src/Tracker.Api`: API host, middleware, endpoints
+- `src/Tracker.AI`: prompts, LLM client, deterministic matcher, analysis orchestration
+- `src/Tracker.Domain`: entities and DTOs
+- `src/Tracker.Infrastructure`: EF Core DB context, migrations, hashing
+- `src/Tracker.Eval`: deterministic eval runner and fixtures
 
 Base URL in development: `http://0.0.0.0:5278` (or `http://localhost:5278` from the same machine)
 
@@ -69,14 +72,10 @@ Eval:
 
 ## Security/Request Guardrails (Current)
 
-- Rate limiting enabled for analysis creation endpoint with strict policy.
-- `429` responses include `Retry-After`.
-- Input validation middleware on `POST`/`PUT` for jobs and resumes:
-  - JSON object shape checks
-  - required string-field checks for create operations
-  - max JD and resume content lengths
-  - basic HTML/script/event-handler pattern rejection
-- oversized request body rejected with `413` and problem JSON.
+- Input validation middleware for `POST`/`PUT` on jobs and resumes
+- Request size cap: `2MB` (`413` on overflow)
+- Basic unsafe HTML/script pattern rejection in text fields
+- Strict rate limiting on analysis creation (`429` + `Retry-After`)
 
 ## Prerequisites
 
@@ -90,9 +89,7 @@ Notes:
 - Provider-specific flags can be configured with `Llm:Providers:<provider>:ExtraFlags`.
 - Deterministic eval runner works without any provider CLI.
 
-## Local Development
-
-Restore/build:
+## Local Run
 
 ```bash
 dotnet restore Tracker.slnx
@@ -172,17 +169,17 @@ Run fixture evals:
 ./scripts/run_deterministic_eval.sh
 ```
 
-Or specify a fixture directory:
+Optional fixture directory override:
 
 ```bash
 ./scripts/run_deterministic_eval.sh src/Tracker.Eval/Fixtures
 ```
 
-Eval runner behavior:
-- reads `*.json` fixtures
-- runs deterministic matcher
+Runner behavior:
+- loads `*.json` fixtures
+- runs deterministic matcher checks
 - prints pass/fail summary
-- exits non-zero if any fixture fails
+- exits non-zero on failure
 
 See:
 - `docs/EVAL_DETERMINISTIC.md`
