@@ -62,10 +62,10 @@ pipeline {
               --arg buildUrl "${env.BUILD_URL}" \\
               --arg result "${result}" \\
               '{
-                buildNumber: ($buildNumber | tonumber),
-                jobName: $jobName,
-                buildUrl: $buildUrl,
-                result: $result,
+                buildNumber: (\$buildNumber | tonumber),
+                jobName: \$jobName,
+                buildUrl: \$buildUrl,
+                result: \$result,
                 stages: .,
                 stageCount: length,
                 totalDurationMs: (map(.durationMs) | add // 0)

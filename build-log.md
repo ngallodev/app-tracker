@@ -257,3 +257,27 @@ Signed-off-by: codex gpt-5
 - Fixed compile error in throughput aggregation caused by `double` to `decimal` conversion mismatch in endpoint helper.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 9 — 2026-02-28 — codex gpt-5
+
+**Branch:** feat/lmstudio-metrics-observability
+**Commit scope:** Fix Jenkins post-always jq interpolation failure (`MissingPropertyException: buildNumber`)
+
+### Changes
+- Updated `Jenkinsfile` post `always` jq filter to escape jq variable references inside Groovy multiline string:
+  - `buildNumber: (\$buildNumber | tonumber)`
+  - `jobName: \$jobName`
+  - `buildUrl: \$buildUrl`
+  - `result: \$result`
+- This prevents Groovy from attempting to resolve `buildNumber` as a Groovy binding property while building the shell command.
+
+### Build Notes
+- Validated updated jq expression is present in `Jenkinsfile`.
+- Root-cause confirmation from `artifacts/logs/tracker-fail.log`: failing run checked out `origin/main` at `0a949b1` and therefore did not include this fix.
+
+### Issues Encountered
+- None after escaping jq variable references.
+
+Signed-off-by: codex gpt-5
