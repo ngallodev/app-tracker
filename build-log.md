@@ -309,3 +309,29 @@ Signed-off-by: codex gpt-5
 - Root cause was `dotnet run` honoring `launchSettings.json` in CI startup path, causing bind failures on `5278`.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 11 — 2026-02-28 — codex gpt-5
+
+**Branch:** main
+**Commit scope:** Stabilize proof-of-life stage startup by decoupling from run_local wait race
+
+### Changes
+- `scripts/proof_of_life.sh`:
+  - Replaced `run_local.sh` wrapper invocation with direct process management for API + frontend.
+  - Added dedicated `API_PID` / `FRONT_PID` tracking and targeted service liveness checks while waiting for URLs.
+  - Added diagnostic log tail emission when a service exits before readiness.
+  - Added `apiUrl` and `uiUrl` fields to proof summary output for easier CI artifact debugging.
+  - Retained dynamic free-port selection and wired URLs to resolved ports.
+  - Updated startup log message for accuracy.
+
+### Build Notes
+- Verified Jenkins-equivalent stage command passes:
+  - `SKIP_ANALYSIS=1 ./scripts/ci_stage.sh proof_of_life ./scripts/proof_of_life.sh`
+- Confirmed summary artifact includes `apiUrl` and `uiUrl` and returns HTTP 200 for UI/API/eval checks.
+
+### Issues Encountered
+- Prior implementation depended on `run_local.sh` `wait -n` behavior, which could terminate the stack if either child process exited early, creating intermittent CI startup failures.
+
+Signed-off-by: codex gpt-5

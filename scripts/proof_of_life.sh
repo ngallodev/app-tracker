@@ -21,12 +21,22 @@ SUMMARY_JSON="${ARTIFACT_DIR}/proof-of-life-summary.json"
 mkdir -p "${LOG_DIR}"
 : > "${RUN_LOG}"
 
-RUNNER_PID=""
+API_PID=""
+FRONT_PID=""
 
 cleanup() {
-  if [[ -n "${RUNNER_PID}" ]] && kill -0 "${RUNNER_PID}" 2>/dev/null; then
-    kill "${RUNNER_PID}" 2>/dev/null || true
-    wait "${RUNNER_PID}" 2>/dev/null || true
+  if [[ -n "${API_PID}" ]] && kill -0 "${API_PID}" 2>/dev/null; then
+    kill "${API_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${FRONT_PID}" ]] && kill -0 "${FRONT_PID}" 2>/dev/null; then
+    kill "${FRONT_PID}" 2>/dev/null || true
+  fi
+
+  if [[ -n "${API_PID}" ]]; then
+    wait "${API_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${FRONT_PID}" ]]; then
+    wait "${FRONT_PID}" 2>/dev/null || true
   fi
 }
 
@@ -64,6 +74,7 @@ pick_free_port() {
 wait_for_url() {
   local url="$1"
   local timeout_seconds="$2"
+  local pid_to_watch="$3"
   local elapsed=0
 
   while [[ "${elapsed}" -lt "${timeout_seconds}" ]]; do
@@ -71,8 +82,10 @@ wait_for_url() {
       return 0
     fi
 
-    if [[ -n "${RUNNER_PID}" ]] && ! kill -0 "${RUNNER_PID}" 2>/dev/null; then
-      echo "Local runner exited before ${url} became available." >&2
+    if [[ -n "${pid_to_watch}" ]] && ! kill -0 "${pid_to_watch}" 2>/dev/null; then
+      echo "Service process exited before ${url} became available." >&2
+      echo "--- proof_of_life.log (tail) ---" >&2
+      tail -n 120 "${RUN_LOG}" >&2 || true
       return 1
     fi
 
@@ -84,7 +97,7 @@ wait_for_url() {
   return 1
 }
 
-echo "Starting local stack via scripts/run_local.sh ..."
+echo "Starting local services for proof-of-life ..."
 resolved_api_port="$(pick_free_port "${API_PORT}")"
 resolved_front_port="$(pick_free_port "${FRONT_PORT}")"
 if [[ -z "${API_URL}" ]]; then
@@ -94,12 +107,21 @@ if [[ -z "${UI_URL}" ]]; then
   UI_URL="http://${FRONT_HOST}:${resolved_front_port}"
 fi
 
-API_HOST="${API_HOST}" API_PORT="${resolved_api_port}" FRONT_HOST="${FRONT_HOST}" FRONT_PORT="${resolved_front_port}" \
-  bash "${ROOT_DIR}/scripts/run_local.sh" >"${RUN_LOG}" 2>&1 &
-RUNNER_PID="$!"
+echo "Starting Tracker.Api on ${API_URL}" >> "${RUN_LOG}"
+HOST="${API_HOST}" PORT="${resolved_api_port}" bash "${ROOT_DIR}/scripts/run_api.sh" >>"${RUN_LOG}" 2>&1 &
+API_PID="$!"
 
-wait_for_url "${UI_URL}/" "${STARTUP_TIMEOUT_SECONDS}"
-wait_for_url "${API_URL}/healthz" "${STARTUP_TIMEOUT_SECONDS}"
+echo "Starting frontend on ${UI_URL}" >> "${RUN_LOG}"
+(
+  cd "${ROOT_DIR}/web"
+  CHOKIDAR_USEPOLLING="${CHOKIDAR_USEPOLLING:-1}" \
+  CHOKIDAR_INTERVAL="${CHOKIDAR_INTERVAL:-1000}" \
+    npm run dev -- --host "${FRONT_HOST}" --port "${resolved_front_port}" --strictPort
+) >>"${RUN_LOG}" 2>&1 &
+FRONT_PID="$!"
+
+wait_for_url "${UI_URL}/" "${STARTUP_TIMEOUT_SECONDS}" "${FRONT_PID}"
+wait_for_url "${API_URL}/healthz" "${STARTUP_TIMEOUT_SECONDS}" "${API_PID}"
 
 ui_status="$(curl -s -o /dev/null -w '%{http_code}' "${UI_URL}/")"
 health_status="$(curl -s -o /dev/null -w '%{http_code}' "${API_URL}/healthz")"
@@ -148,8 +170,12 @@ jq -n \
   --arg evalBody "${eval_body}" \
   --arg jobId "${job_id}" \
   --arg resumeId "${resume_id}" \
+  --arg apiUrl "${API_URL}" \
+  --arg uiUrl "${UI_URL}" \
   '{
     startedVia: $startedVia,
+    apiUrl: $apiUrl,
+    uiUrl: $uiUrl,
     uiStatus: ($uiStatus | tonumber),
     apiHealthStatus: ($apiHealthStatus | tonumber),
     analysesListStatus: ($analysesListStatus | tonumber),
