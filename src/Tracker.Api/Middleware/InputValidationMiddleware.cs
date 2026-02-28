@@ -64,16 +64,30 @@ public class InputValidationMiddleware
             }
 
             var isPost = HttpMethods.IsPost(context.Request.Method);
-            if (isPost && !HasNonEmptyStringProperty(root, "title"))
+            var isExtractFromUrl = context.Request.Path.Value?.EndsWith("/extract-from-url", StringComparison.OrdinalIgnoreCase) == true;
+            if (isExtractFromUrl)
             {
-                await WriteProblemDetails(context, 400, "Validation Failed", "Field 'title' is required.");
-                return false;
+                if (!HasNonEmptyStringProperty(root, "sourceUrl"))
+                {
+                    await WriteProblemDetails(context, 400, "Validation Failed", "Field 'sourceUrl' is required.");
+                    return false;
+                }
             }
-
-            if (isPost && !HasNonEmptyStringProperty(root, "company"))
+            else
             {
-                await WriteProblemDetails(context, 400, "Validation Failed", "Field 'company' is required.");
-                return false;
+                var hasSourceUrl = HasNonEmptyStringProperty(root, "sourceUrl");
+
+                if (isPost && !hasSourceUrl && !HasNonEmptyStringProperty(root, "title"))
+                {
+                    await WriteProblemDetails(context, 400, "Validation Failed", "Field 'title' is required when 'sourceUrl' is not supplied.");
+                    return false;
+                }
+
+                if (isPost && !hasSourceUrl && !HasNonEmptyStringProperty(root, "company"))
+                {
+                    await WriteProblemDetails(context, 400, "Validation Failed", "Field 'company' is required when 'sourceUrl' is not supplied.");
+                    return false;
+                }
             }
 
             if (TryGetStringProperty(root, "descriptionText", out var descriptionText) && descriptionText is not null)

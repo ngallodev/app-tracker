@@ -393,3 +393,33 @@ Signed-off-by: codex gpt-5
 - Bookmarklet runtime verification in a live browser session was not executed in this terminal-only pass; backend ingestion compatibility for bookmarklet-style payloads is implemented.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 10 — 2026-02-28 — codex gpt-5
+
+**Branch:** main
+**Commit scope:** Fix URL-only job create validation and ingestion fallback; complete live smoke verification of new application/test-data workflows
+
+### Changes
+- `src/Tracker.Api/Middleware/InputValidationMiddleware.cs`
+  - Allowed URL-only create-job flow by requiring `title/company` only when `sourceUrl` is absent.
+  - Added special-case validation for `POST /api/jobs/extract-from-url` to require only `sourceUrl`.
+- `src/Tracker.Api/Services/JobIngestionService.cs`
+  - Wrapped remote URL fetch in safe fallback to avoid unhandled `HttpRequestException` on non-200 source pages.
+
+### Build Notes
+- `dotnet build Tracker.slnx -v minimal` succeeded.
+- `cd web && npm run build` succeeded.
+
+### Runtime Smoke Notes
+- Verified `GET /api/analyses/providers` returns provider list/default.
+- Verified URL-only `POST /api/jobs` now succeeds and creates fallback title/company when source fetch is unavailable.
+- Verified application lifecycle flow:
+  - `POST /api/applications`
+  - `POST /api/applications/{id}/events`
+  - `PUT /api/applications/{id}`
+- Verified `DELETE /api/dev/test-data` removes test-tagged rows.
+- Verified bookmarklet-style job payload extraction captures work type, employment type, salary, and recruiter contact fields.
+
+Signed-off-by: codex gpt-5
