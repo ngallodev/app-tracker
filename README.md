@@ -83,10 +83,15 @@ Eval:
 - CLI providers available in `PATH` (default auto-detect targets):
   - `claude`, `codex`, `gemini`, `qwen`, `opencode`
   - `kilo` (or `kilocode`) for the `kilocode` provider
+- Optional OpenAI-compatible local endpoint provider:
+  - `lmstudio` via `Llm:LmStudio:*` config keys (default model `neuraldaredevil-8b-abliterated`, max input `8192`)
 
 Notes:
 - You can force a provider binary with `Llm:Providers:<provider>:Command` (absolute path or command name).
 - Provider-specific flags can be configured with `Llm:Providers:<provider>:ExtraFlags`.
+- For LM Studio/OpenAI-compatible servers, set `Llm:LmStudio:BaseUrl` (for example `http://plat-server.local:1234/v1`).
+- Store endpoint token in a local file and set `Llm:LmStudio:ApiKeyFile` (default: `secrets/lmstudio_api_key.txt`).
+- Tool-calling capability notes for local LM Studio are documented in `docs/LMSTUDIO_NOTES.md`.
 - Deterministic eval runner works without any provider CLI.
 
 ## Local Run

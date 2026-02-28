@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Tracker.AI.Cli;
 using Tracker.AI.Models;
 using Tracker.AI.Prompts;
 
@@ -46,6 +47,12 @@ public record AnalysisMetadata
 {
     public required string Provider { get; init; }
     public required string ExecutionMode { get; init; }
+    public required int JdInputTokens { get; init; }
+    public required int JdOutputTokens { get; init; }
+    public required int JdLatencyMs { get; init; }
+    public required int GapInputTokens { get; init; }
+    public required int GapOutputTokens { get; init; }
+    public required int GapLatencyMs { get; init; }
     public required int TotalInputTokens { get; init; }
     public required int TotalOutputTokens { get; init; }
     public required int TotalLatencyMs { get; init; }
@@ -169,7 +176,13 @@ public class AnalysisService : IAnalysisService
             Metadata = new AnalysisMetadata
             {
                 Provider = jdResult.Provider,
-                ExecutionMode = "cli_headless",
+                ExecutionMode = ResolveExecutionMode(jdResult.Provider),
+                JdInputTokens = jdResult.Usage.InputTokens,
+                JdOutputTokens = jdResult.Usage.OutputTokens,
+                JdLatencyMs = jdResult.LatencyMs,
+                GapInputTokens = gapResult.Usage.InputTokens,
+                GapOutputTokens = gapResult.Usage.OutputTokens,
+                GapLatencyMs = gapResult.LatencyMs,
                 TotalInputTokens = totalInputTokens,
                 TotalOutputTokens = totalOutputTokens,
                 TotalLatencyMs = (int)sw.ElapsedMilliseconds,
@@ -185,6 +198,11 @@ public class AnalysisService : IAnalysisService
             }
         };
     }
+
+    private static string ResolveExecutionMode(string provider)
+        => string.Equals(provider, LlmProviderCatalog.Lmstudio, StringComparison.OrdinalIgnoreCase)
+            ? "openai_compatible"
+            : "cli_headless";
     
     /// <summary>
     /// Calculate deterministic scores. No LLM self-grading.

@@ -6,4 +6,7 @@
     <Project Path="src/Tracker.Eval/Tracker.Eval.csproj" />
     <Project Path="src/Tracker.Infrastructure/Tracker.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tracker.AI.Tests/Tracker.AI.Tests.csproj" />
+  </Folder>
 </Solution>

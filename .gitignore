@@ -35,6 +35,7 @@ x86/
 
 # User secrets
 secrets.json
+secrets/
 appsettings.Development.json
 
 # Logs

@@ -1,5 +1,7 @@
 using System.Data;
+using System.ClientModel;
 using Microsoft.EntityFrameworkCore;
+using OpenAI;
 using Serilog;
 using Tracker.Api.Endpoints;
 using Tracker.Api.Extensions;
@@ -26,6 +28,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddAnalysisRateLimiting();
 builder.Services.AddTrackerHealthChecks();
 builder.Services.Configure<LlmCliOptions>(builder.Configuration.GetSection("Llm"));
+builder.Services.Configure<LmStudioOptions>(builder.Configuration.GetSection("Llm:LmStudio"));
 
 // Configure SQLite
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -41,7 +44,32 @@ builder.Services.AddSingleton<ICliProviderAdapter, GeminiCliProviderAdapter>();
 builder.Services.AddSingleton<ICliProviderAdapter, QwenCliProviderAdapter>();
 builder.Services.AddSingleton<ICliProviderAdapter, KilocodeCliProviderAdapter>();
 builder.Services.AddSingleton<ICliProviderAdapter, OpencodeCliProviderAdapter>();
-builder.Services.AddSingleton<ILlmClient, CliLlmClientRouter>();
+builder.Services.AddSingleton<CliLlmClientRouter>();
+builder.Services.AddSingleton<OpenAiClient>(serviceProvider =>
+{
+    var options = serviceProvider.GetRequiredService<IConfiguration>().GetSection("Llm:LmStudio").Get<LmStudioOptions>() ?? new LmStudioOptions();
+    var environment = serviceProvider.GetRequiredService<IHostEnvironment>();
+    var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+    var policyLogger = loggerFactory.CreateLogger("LmStudioPolicy");
+    var startupLogger = loggerFactory.CreateLogger("LmStudioStartup");
+    var openAiClientLogger = serviceProvider.GetRequiredService<ILogger<OpenAiClient>>();
+    var policy = PollyPolicies.CreateLlmCallPolicy(policyLogger);
+    var apiKey = ResolveLmStudioApiKey(environment.ContentRootPath, options, startupLogger);
+    var baseUrl = EnsureVersionedOpenAiBaseUrl(options.BaseUrl);
+    var openAiClient = new OpenAIClient(
+        new ApiKeyCredential(apiKey),
+        new OpenAIClientOptions { Endpoint = new Uri(baseUrl) });
+
+    return new OpenAiClient(
+        openAiClient,
+        openAiClientLogger,
+        policy,
+        providerName: LlmProviderCatalog.Lmstudio,
+        chatModel: options.ChatModel,
+        embeddingModel: options.EmbeddingModel,
+        maxInputTokens: options.MaxInputTokens);
+});
+builder.Services.AddSingleton<ILlmClient, HybridLlmClientRouter>();
 builder.Services.AddScoped<IAnalysisService, AnalysisService>();
 
 var app = builder.Build();
@@ -90,7 +118,7 @@ app.MapGet("/version", () => Results.Ok(new
 {
     version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "1.0.0",
     environment = app.Environment.EnvironmentName,
-    llmMode = "cli_headless",
+    llmMode = "hybrid_cli_openai_compatible",
     defaultProvider = builder.Configuration["Llm:DefaultProvider"] ?? LlmProviderCatalog.Claude
 }))
 .WithName("GetVersion");
@@ -116,6 +144,47 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+static string EnsureVersionedOpenAiBaseUrl(string? baseUrl)
+{
+    var trimmed = string.IsNullOrWhiteSpace(baseUrl)
+        ? "http://127.0.0.1:1234/v1"
+        : baseUrl.Trim();
+    return trimmed.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)
+        ? trimmed
+        : $"{trimmed.TrimEnd('/')}/v1";
+}
+
+static string ResolveLmStudioApiKey(
+    string contentRootPath,
+    LmStudioOptions options,
+    Microsoft.Extensions.Logging.ILogger logger)
+{
+    if (!string.IsNullOrWhiteSpace(options.ApiKeyFile))
+    {
+        var configuredPath = options.ApiKeyFile.Trim();
+        var resolvedPath = Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.GetFullPath(Path.Combine(contentRootPath, configuredPath));
+
+        if (File.Exists(resolvedPath))
+        {
+            var fromFile = File.ReadAllText(resolvedPath).Trim();
+            if (!string.IsNullOrWhiteSpace(fromFile))
+            {
+                return fromFile;
+            }
+
+            logger.LogWarning("Configured LM Studio api key file was empty: {Path}", resolvedPath);
+        }
+        else
+        {
+            logger.LogWarning("Configured LM Studio api key file was not found: {Path}", resolvedPath);
+        }
+    }
+
+    return string.IsNullOrWhiteSpace(options.ApiKey) ? "lm-studio" : options.ApiKey;
+}
 
 file static class MigrationBootstrapper
 {

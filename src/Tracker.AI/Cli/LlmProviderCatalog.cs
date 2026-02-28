@@ -9,6 +9,7 @@ public static class LlmProviderCatalog
     public const string Qwen = "qwen";
     public const string Kilocode = "kilocode";
     public const string Opencode = "opencode";
+    public const string Lmstudio = "lmstudio";
 
     private static readonly HashSet<string> Allowed = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -17,7 +18,8 @@ public static class LlmProviderCatalog
         Gemini,
         Qwen,
         Kilocode,
-        Opencode
+        Opencode,
+        Lmstudio
     };
 
     public static bool IsSupported(string? value)

@@ -42,6 +42,7 @@ public static class AnalysesEndpoints
             analysis.InputTokens,
             analysis.OutputTokens,
             analysis.LatencyMs,
+            TokensPerSecond(analysis.InputTokens, analysis.OutputTokens, analysis.LatencyMs),
             ResolveProvider(analysis),
             ResolveExecutionMode(analysis),
             analysis.CreatedAt
@@ -70,6 +71,7 @@ public static class AnalysesEndpoints
             analysis.InputTokens,
             analysis.OutputTokens,
             analysis.LatencyMs,
+            TokensPerSecond(analysis.InputTokens, analysis.OutputTokens, analysis.LatencyMs),
             provider,
             executionMode,
             analysis.CreatedAt
@@ -119,7 +121,14 @@ public static class AnalysesEndpoints
     private static string ResolveExecutionMode(Analysis analysis)
     {
         var provider = ResolveProvider(analysis);
-        return provider == "unknown" ? "unknown" : "cli_headless";
+        if (provider == "unknown")
+        {
+            return "unknown";
+        }
+
+        return string.Equals(provider, LlmProviderCatalog.Lmstudio, StringComparison.OrdinalIgnoreCase)
+            ? "openai_compatible"
+            : "cli_headless";
     }
 
     private static AnalysisRequestMetric CreateRequestMetric(
@@ -176,6 +185,28 @@ public static class AnalysesEndpoints
         var rank = (int)Math.Ceiling(ordered.Count * 0.95m);
         rank = Math.Clamp(rank, 1, ordered.Count);
         return ordered[rank - 1];
+    }
+
+    private static decimal AverageTokensPerSecond(IReadOnlyCollection<AnalysisRequestMetric> metrics)
+    {
+        if (metrics.Count == 0)
+        {
+            return 0m;
+        }
+
+        return Math.Round(metrics.Average(m => TokensPerSecond(m.InputTokens, m.OutputTokens, m.LatencyMs)), 2);
+    }
+
+    private static decimal TokensPerSecond(int inputTokens, int outputTokens, int latencyMs)
+    {
+        var totalTokens = Math.Max(0, inputTokens + outputTokens);
+        if (latencyMs <= 0 || totalTokens == 0)
+        {
+            return 0m;
+        }
+
+        var seconds = latencyMs / 1000m;
+        return seconds <= 0m ? 0m : Math.Round(totalTokens / seconds, 2);
     }
 
     public static IEndpointRouteBuilder MapAnalysisEndpoints(this IEndpointRouteBuilder app)
@@ -241,6 +272,9 @@ public static class AnalysesEndpoints
             var avgTokensPerRequest = AverageTokens(completed);
             var fallbackAvgTokens = AverageTokens(fallbackCompleted);
             var deterministicAvgTokens = AverageTokens(deterministicCompleted);
+            var averageTokensPerSecond = AverageTokensPerSecond(completed);
+            var fallbackAverageTokensPerSecond = AverageTokensPerSecond(fallbackCompleted);
+            var deterministicAverageTokensPerSecond = AverageTokensPerSecond(deterministicCompleted);
 
             var latestEvalRun = await db.EvalRuns
                 .AsNoTracking()
@@ -271,6 +305,9 @@ public static class AnalysesEndpoints
                     averageTokensPerRequest = avgTokensPerRequest,
                     fallbackAverageTokensPerRequest = fallbackAvgTokens,
                     deterministicAverageTokensPerRequest = deterministicAvgTokens,
+                    averageTokensPerSecond = averageTokensPerSecond,
+                    fallbackAverageTokensPerSecond = fallbackAverageTokensPerSecond,
+                    deterministicAverageTokensPerSecond = deterministicAverageTokensPerSecond,
                     cacheHitRateOverallPct = cacheHitRateOverall,
                     cacheHitRateOnRepeatedJdsPct = cacheHitRateRepeatedJds,
                     p95LatencyMs = new
@@ -285,7 +322,8 @@ public static class AnalysesEndpoints
                     $"Deterministic-first matching resolved {deterministicResolutionRate}% of uncached completed requests without LLM fallback, reducing inference cost.",
                     $"Content-hash caching eliminated {cacheHitRateRepeatedJds}% of redundant requests on repeated job descriptions.",
                     $"Achieved {evalPassRate}% reproducibility across {evalFixtureCount} fixture-based eval cases (latest deterministic eval run).",
-                    $"Average token usage per completed request: deterministic {deterministicAvgTokens} tokens vs fallback {fallbackAvgTokens} tokens."
+                    $"Average token usage per completed request: deterministic {deterministicAvgTokens} tokens vs fallback {fallbackAvgTokens} tokens.",
+                    $"Average throughput: deterministic {deterministicAverageTokensPerSecond} tokens/sec vs fallback {fallbackAverageTokensPerSecond} tokens/sec."
                 }
             });
         })
@@ -514,6 +552,58 @@ public static class AnalysesEndpoints
                     RawResponse = result.Metadata.JdRawResponse,
                     ParseSuccess = result.Metadata.JdParseSuccess,
                     RepairAttempted = result.Metadata.JdRepairAttempted,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+
+                db.LlmLogs.Add(new LlmLog
+                {
+                    Id = Guid.NewGuid(),
+                    AnalysisId = analysis.Id,
+                    StepName = "metrics_jd",
+                    RawResponse = JsonSerializer.Serialize(new
+                    {
+                        inputTokens = result.Metadata.JdInputTokens,
+                        outputTokens = result.Metadata.JdOutputTokens,
+                        latencyMs = result.Metadata.JdLatencyMs,
+                        tokensPerSecond = TokensPerSecond(result.Metadata.JdInputTokens, result.Metadata.JdOutputTokens, result.Metadata.JdLatencyMs)
+                    }),
+                    ParseSuccess = true,
+                    RepairAttempted = false,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+
+                db.LlmLogs.Add(new LlmLog
+                {
+                    Id = Guid.NewGuid(),
+                    AnalysisId = analysis.Id,
+                    StepName = "metrics_gap",
+                    RawResponse = JsonSerializer.Serialize(new
+                    {
+                        mode = result.Metadata.GapAnalysisMode,
+                        inputTokens = result.Metadata.GapInputTokens,
+                        outputTokens = result.Metadata.GapOutputTokens,
+                        latencyMs = result.Metadata.GapLatencyMs,
+                        tokensPerSecond = TokensPerSecond(result.Metadata.GapInputTokens, result.Metadata.GapOutputTokens, result.Metadata.GapLatencyMs)
+                    }),
+                    ParseSuccess = true,
+                    RepairAttempted = false,
+                    CreatedAt = DateTimeOffset.UtcNow
+                });
+
+                db.LlmLogs.Add(new LlmLog
+                {
+                    Id = Guid.NewGuid(),
+                    AnalysisId = analysis.Id,
+                    StepName = "metrics_overall",
+                    RawResponse = JsonSerializer.Serialize(new
+                    {
+                        inputTokens = result.Metadata.TotalInputTokens,
+                        outputTokens = result.Metadata.TotalOutputTokens,
+                        latencyMs = result.Metadata.TotalLatencyMs,
+                        tokensPerSecond = TokensPerSecond(result.Metadata.TotalInputTokens, result.Metadata.TotalOutputTokens, result.Metadata.TotalLatencyMs)
+                    }),
+                    ParseSuccess = true,
+                    RepairAttempted = false,
                     CreatedAt = DateTimeOffset.UtcNow
                 });
 

@@ -207,3 +207,53 @@ Signed-off-by: codex gpt-5
 - None.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 8 — 2026-02-28 — codex gpt-5
+
+**Branch:** feat/lmstudio-metrics-observability
+**Commit scope:** Add LM Studio provider integration, strict structured JSON schema mode, observability throughput metrics, docs references, and targeted tests
+
+### Changes
+- Added OpenAI-compatible LM Studio provider path with config-backed model/endpoints:
+  - `src/Tracker.AI/LmStudioOptions.cs`
+  - `src/Tracker.AI/HybridLlmClientRouter.cs`
+  - `src/Tracker.Api/Program.cs`
+  - `src/Tracker.Api/appsettings.json`
+  - `src/Tracker.AI/Cli/LlmProviderCatalog.cs`
+- Added secure API key file loading for LM Studio (`Llm:LmStudio:ApiKeyFile`) and local secret ignore rule:
+  - `.gitignore`
+  - `src/Tracker.Api/Program.cs`
+- Enabled strict structured outputs (`response_format: json_schema`) for analysis types in OpenAI-compatible flow:
+  - `src/Tracker.AI/StructuredOutputSchemas.cs`
+  - `src/Tracker.AI/OpenAiClient.cs`
+- Expanded analysis observability metrics:
+  - Added `tokensPerSecond` in analysis response DTO and endpoint mapping.
+  - Added aggregate throughput metrics to `/api/analyses/metrics` (`averageTokensPerSecond`, deterministic/fallback throughput).
+  - Added persisted step metrics logs in `llm_logs` (`metrics_jd`, `metrics_gap`, `metrics_overall`) with token/latency/throughput payloads.
+  - Updated execution-mode attribution for openai-compatible flow.
+- Added focused test project for LM Studio observability/config correctness:
+  - `tests/Tracker.AI.Tests/Tracker.AI.Tests.csproj`
+  - `tests/Tracker.AI.Tests/StructuredOutputSchemasTests.cs`
+  - `tests/Tracker.AI.Tests/LlmProviderCatalogTests.cs`
+  - `tests/Tracker.AI.Tests/HybridLlmClientRouterTests.cs`
+  - Added tests folder to `Tracker.slnx`.
+- Added and linked local LM Studio docs/examples references:
+  - `docs/LMSTUDIO_NOTES.md`
+  - `README.md`
+  - Example files under `docs/` and `docs/archive-ignore/`.
+
+### Build Notes
+- `dotnet build Tracker.slnx -v minimal` succeeded (1 non-fatal MSBuild copy warning observed for nested bin path behavior).
+- `dotnet test Tracker.slnx -v minimal` succeeded (`Passed: 4, Failed: 0`).
+- `./scripts/ci_stage.sh deterministic_eval ./scripts/run_deterministic_eval.sh` succeeded (`Fixtures: 10, Passed: 10, Failed: 0`).
+- Live LM Studio smoke test via API (`provider=lmstudio`) succeeded:
+  - Analysis response included `tokensPerSecond`.
+  - `/api/analyses/metrics` included throughput metrics.
+  - `llm_logs` captured `metrics_jd`, `metrics_gap`, `metrics_overall` rows.
+
+### Issues Encountered
+- Fixed compile error in throughput aggregation caused by `double` to `decimal` conversion mismatch in endpoint helper.
+
+Signed-off-by: codex gpt-5

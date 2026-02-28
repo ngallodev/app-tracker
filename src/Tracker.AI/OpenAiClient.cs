@@ -15,8 +15,10 @@ namespace Tracker.AI;
 public class OpenAiClient : ILlmClient
 {
     private readonly OpenAIClient _client;
+    private readonly string _providerName;
     private readonly string _chatModel;
     private readonly string _embeddingModel;
+    private readonly int _maxInputTokens;
     private readonly ILogger<OpenAiClient> _logger;
     private readonly IAsyncPolicy _resiliencePolicy;
 
@@ -24,12 +26,21 @@ public class OpenAiClient : ILlmClient
         OpenAIClient client,
         ILogger<OpenAiClient> logger,
         IAsyncPolicy resiliencePolicy,
-        string chatModel = "gpt-4o-mini",
-        string embeddingModel = "text-embedding-3-small")
+        string providerName = "openai",
+        string chatModel = "",
+        string embeddingModel = "text-embedding-3-small",
+        int maxInputTokens = 8192)
     {
+        if (string.IsNullOrWhiteSpace(chatModel))
+        {
+            throw new ArgumentException("Chat model is required.", nameof(chatModel));
+        }
+
         _client = client;
+        _providerName = providerName;
         _chatModel = chatModel;
         _embeddingModel = embeddingModel;
+        _maxInputTokens = Math.Max(1, maxInputTokens);
         _logger = logger;
         _resiliencePolicy = resiliencePolicy;
     }
@@ -41,9 +52,22 @@ public class OpenAiClient : ILlmClient
         CancellationToken cancellationToken = default) where T : class
     {
         var sw = Stopwatch.StartNew();
+        var providerName = string.IsNullOrWhiteSpace(providerOverride)
+            ? _providerName
+            : providerOverride.Trim().ToLowerInvariant();
+        var estimatedInputTokens = CountTokens(systemPrompt) + CountTokens(userPrompt);
+        if (estimatedInputTokens > _maxInputTokens)
+        {
+            throw new LlmException(
+                $"Input exceeds configured context window for provider '{providerName}' ({estimatedInputTokens} > {_maxInputTokens} tokens).",
+                400,
+                "context_window_exceeded");
+        }
+
+        var responseFormat = BuildResponseFormat<T>();
         var options = new ChatCompletionOptions
         {
-            ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat(),
+            ResponseFormat = responseFormat,
             Temperature = 0.1f,
             MaxOutputTokenCount = 4096
         };
@@ -128,7 +152,7 @@ public class OpenAiClient : ILlmClient
                     InputTokens = totalInputTokens,
                     OutputTokens = totalOutputTokens
                 },
-                Provider = "openai",
+                Provider = providerName,
                 Model = _chatModel,
                 LatencyMs = (int)sw.ElapsedMilliseconds,
                 ParseSuccess = initialParseSuccess,
@@ -207,6 +231,21 @@ public class OpenAiClient : ILlmClient
         }
 
         return string.Concat(completion.Content.Select(c => c.Text));
+    }
+
+    private static ChatResponseFormat BuildResponseFormat<T>() where T : class
+    {
+        var schema = StructuredOutputSchemas.GetForType<T>();
+        if (schema is null)
+        {
+            return ChatResponseFormat.CreateJsonObjectFormat();
+        }
+
+        return ChatResponseFormat.CreateJsonSchemaFormat(
+            schema.Name,
+            BinaryData.FromString(schema.SchemaJson),
+            schema.Description,
+            jsonSchemaIsStrict: true);
     }
 
     private bool TryDeserialize<T>(string content, out T? value) where T : class

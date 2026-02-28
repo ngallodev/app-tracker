@@ -15,6 +15,7 @@ public record AnalysisResultDto(
     int InputTokens,
     int OutputTokens,
     int LatencyMs,
+    decimal TokensPerSecond,
     string Provider,
     string ExecutionMode,
     DateTimeOffset CreatedAt
