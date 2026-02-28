@@ -281,3 +281,31 @@ Signed-off-by: codex gpt-5
 - None after escaping jq variable references.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 10 — 2026-02-28 — codex gpt-5
+
+**Branch:** main
+**Commit scope:** Harden Jenkins proof-of-life against port collisions and launch profile overrides
+
+### Changes
+- `scripts/run_api.sh`:
+  - Added `--no-launch-profile` to `dotnet run` so runtime ports from env (`ASPNETCORE_URLS`) are honored in CI.
+  - Fixes cases where `launchSettings.json` forced `http://0.0.0.0:5278` despite requested alternate port.
+- `scripts/proof_of_life.sh`:
+  - Added free-port selection helpers for API/UI startup (`pick_free_port`, `is_port_in_use`).
+  - Added host/port variables (`API_HOST`, `FRONT_HOST`, `API_PORT`, `FRONT_PORT`) and wired them into `run_local.sh` launch.
+  - Updated default URLs to derive from resolved host/port values.
+- `Jenkinsfile`:
+  - Updated Proof Of Life stage to run with `SKIP_ANALYSIS=1` to avoid external provider dependency and reduce CI flakiness.
+
+### Build Notes
+- Reproduced port-collision scenario by occupying port `5278`; verified proof-of-life now starts API on next free port and completes.
+- Verified Jenkins-equivalent proof stage command succeeds:
+  - `SKIP_ANALYSIS=1 ./scripts/ci_stage.sh proof_of_life ./scripts/proof_of_life.sh`
+
+### Issues Encountered
+- Root cause was `dotnet run` honoring `launchSettings.json` in CI startup path, causing bind failures on `5278`.
+
+Signed-off-by: codex gpt-5

@@ -18,4 +18,4 @@ if [[ "${NO_BUILD}" == "1" ]]; then
 fi
 
 echo "Starting Tracker.Api on ${ASPNETCORE_URLS}"
-exec dotnet run "${RUN_ARGS[@]}" --project "${ROOT_DIR}/src/Tracker.Api/Tracker.Api.csproj"
+exec dotnet run --no-launch-profile "${RUN_ARGS[@]}" --project "${ROOT_DIR}/src/Tracker.Api/Tracker.Api.csproj"

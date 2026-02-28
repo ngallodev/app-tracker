@@ -3,8 +3,12 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-${ROOT_DIR}/artifacts}"
-API_URL="${API_URL:-http://localhost:5278}"
-UI_URL="${UI_URL:-http://localhost:5173}"
+API_HOST="${API_HOST:-127.0.0.1}"
+FRONT_HOST="${FRONT_HOST:-127.0.0.1}"
+API_PORT="${API_PORT:-5278}"
+FRONT_PORT="${FRONT_PORT:-5173}"
+API_URL="${API_URL:-}"
+UI_URL="${UI_URL:-}"
 STARTUP_TIMEOUT_SECONDS="${STARTUP_TIMEOUT_SECONDS:-60}"
 ANALYSIS_PROVIDER="${ANALYSIS_PROVIDER:-}"
 SKIP_ANALYSIS="${SKIP_ANALYSIS:-0}"
@@ -27,6 +31,35 @@ cleanup() {
 }
 
 trap cleanup EXIT INT TERM
+
+is_port_in_use() {
+  local port="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+
+  ss -H -ltn | awk '{print $4}' | grep -Eq "[:.]${port}$"
+}
+
+pick_free_port() {
+  local start_port="$1"
+  local max_tries="${2:-100}"
+  local candidate="${start_port}"
+  local tries=0
+
+  while [[ "${tries}" -lt "${max_tries}" ]]; do
+    if ! is_port_in_use "${candidate}"; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+
+    candidate=$((candidate + 1))
+    tries=$((tries + 1))
+  done
+
+  return 1
+}
 
 wait_for_url() {
   local url="$1"
@@ -52,7 +85,17 @@ wait_for_url() {
 }
 
 echo "Starting local stack via scripts/run_local.sh ..."
-bash "${ROOT_DIR}/scripts/run_local.sh" >"${RUN_LOG}" 2>&1 &
+resolved_api_port="$(pick_free_port "${API_PORT}")"
+resolved_front_port="$(pick_free_port "${FRONT_PORT}")"
+if [[ -z "${API_URL}" ]]; then
+  API_URL="http://${API_HOST}:${resolved_api_port}"
+fi
+if [[ -z "${UI_URL}" ]]; then
+  UI_URL="http://${FRONT_HOST}:${resolved_front_port}"
+fi
+
+API_HOST="${API_HOST}" API_PORT="${resolved_api_port}" FRONT_HOST="${FRONT_HOST}" FRONT_PORT="${resolved_front_port}" \
+  bash "${ROOT_DIR}/scripts/run_local.sh" >"${RUN_LOG}" 2>&1 &
 RUNNER_PID="$!"
 
 wait_for_url "${UI_URL}/" "${STARTUP_TIMEOUT_SECONDS}"

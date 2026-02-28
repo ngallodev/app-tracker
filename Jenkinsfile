@@ -45,7 +45,7 @@ pipeline {
 
     stage('Proof Of Life') {
       steps {
-        sh './scripts/ci_stage.sh proof_of_life ./scripts/proof_of_life.sh'
+        sh 'SKIP_ANALYSIS=1 ./scripts/ci_stage.sh proof_of_life ./scripts/proof_of_life.sh'
       }
     }
   }
