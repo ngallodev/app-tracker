@@ -187,3 +187,23 @@ Signed-off-by: codex gpt-5
 - None; refactor completed as structural/documentation normalization.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 7 — 2026-02-27 — codex gpt-5
+
+**Branch:** chore/deterministic-eval-and-doc-archive
+**Commit scope:** Stop tracking generated frontend dist artifacts
+
+### Changes
+- `.gitignore`: added `web/dist/` so frontend build outputs are ignored.
+- Removed tracked `web/dist` artifacts from git index (kept locally on disk).
+
+### Build Notes
+- No rebuild required for this change; it is repository hygiene only.
+- Verified ignore behavior with `git check-ignore` against `web/dist/index.html`.
+
+### Issues Encountered
+- None.
+
+Signed-off-by: codex gpt-5
