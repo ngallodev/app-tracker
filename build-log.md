@@ -335,3 +335,61 @@ Signed-off-by: codex gpt-5
 - Prior implementation depended on `run_local.sh` `wait -n` behavior, which could terminate the stack if either child process exited early, creating intermittent CI startup failures.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 9 — 2026-02-28 — codex gpt-5
+
+**Branch:** main
+**Commit scope:** Implement URL/file ingestion, provider-aware analysis UX, LM Studio chunking, test-data lifecycle controls, and relational application tracking
+
+### Changes
+- Expanded domain schema and EF model for product requirements:
+  - Added job metadata fields (`workType`, `employmentType`, salary range/currency, recruiter/contact links, careers URL, `isTestData`).
+  - Added resume salary preference and `isTestData` fields.
+  - Added analysis error categorization, `isTestData`, and salary alignment output fields.
+  - Added relational application model: `job_applications` and `job_application_events`.
+- Added migration `20260228135256_AddJobImportAndApplications` and updated model snapshot.
+- Added deterministic job ingestion service:
+  - URL fetch + HTML text extraction.
+  - Deterministic extraction of work type, employment type, salary signal, and contact fields.
+- Updated job endpoints:
+  - URL-only create-job support (title/company auto-filled when available).
+  - `POST /api/jobs/extract-from-url` for preview/import assist.
+- Updated analysis endpoints:
+  - `GET /api/analyses/providers` to return provider availability + default provider selection.
+  - Added salary alignment score/note in responses.
+  - Added error category/details propagation and test-data propagation.
+- Added development cleanup endpoint:
+  - `DELETE /api/dev/test-data` for deleting test-generated jobs/resumes/analyses/applications.
+- Added applications API:
+  - list/get/create/update app records.
+  - add timeline events with status transitions (interview/offer/rejection).
+- Improved LM Studio success behavior in `AnalysisService`:
+  - chunk long JD payloads into multiple structured extraction calls.
+  - merge partial structured outputs before deterministic gap scoring.
+- Rebuilt active frontend `web/src/App.tsx` with:
+  - provider dropdown defaulting to available configured provider.
+  - URL import action for jobs.
+  - `.txt`/`.md` upload + drag/drop for job description and resume content.
+  - explicit analysis metric explanations (coverage/groundedness) and failure detail surface.
+  - salary preference capture + salary match display in analysis detail.
+  - application tracking UI (mark applied, status changes, events timeline).
+  - one-click clear test-data action.
+- Added frontend execution skill artifact:
+  - `.codex/skills/app-tracker-frontend-optimizer/SKILL.md`.
+- Updated active planning docs:
+  - `docs/WORKBOARD.md` expanded with new in-progress tickets for lifecycle, ingestion/test-data ops, and analysis UX/provider reliability.
+  - `README.md` endpoint inventory updated for new APIs.
+
+### Build Notes
+- `dotnet build Tracker.slnx -v minimal` succeeded (0 warnings, 0 errors).
+- `dotnet ef migrations add AddJobImportAndApplications --project src/Tracker.Infrastructure --startup-project src/Tracker.Api` succeeded.
+- `cd web && npm run build` succeeded.
+- `dotnet test tests/Tracker.AI.Tests/Tracker.AI.Tests.csproj -v minimal` passed (4/4).
+
+### Issues Encountered
+- EF tools emitted version warning (`10.0.2` tools vs `10.0.3` runtime); migration generation still completed successfully.
+- Bookmarklet runtime verification in a live browser session was not executed in this terminal-only pass; backend ingestion compatibility for bookmarklet-style payloads is implemented.
+
+Signed-off-by: codex gpt-5

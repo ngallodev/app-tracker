@@ -50,6 +50,7 @@ Jobs:
 - `GET /api/jobs`
 - `GET /api/jobs/{id}`
 - `POST /api/jobs`
+- `POST /api/jobs/extract-from-url`
 - `PUT /api/jobs/{id}`
 - `DELETE /api/jobs/{id}`
 
@@ -62,6 +63,7 @@ Resumes:
 
 Analyses:
 - `GET /api/analyses`
+- `GET /api/analyses/providers`
 - `GET /api/analyses/{id}`
 - `GET /api/analyses/{id}/status`
 - `POST /api/analyses`
@@ -69,6 +71,16 @@ Analyses:
 Eval:
 - `GET /eval/runs`
 - `POST /eval/run`
+
+Applications:
+- `GET /api/applications`
+- `GET /api/applications/{id}`
+- `POST /api/applications`
+- `PUT /api/applications/{id}`
+- `POST /api/applications/{id}/events`
+
+Development:
+- `DELETE /api/dev/test-data`
 
 ## Security/Request Guardrails (Current)
 

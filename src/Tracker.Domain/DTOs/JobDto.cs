@@ -6,6 +6,17 @@ public record JobDto(
     string Company,
     string? DescriptionText,
     string? SourceUrl,
+    string? WorkType,
+    string? EmploymentType,
+    decimal? SalaryMin,
+    decimal? SalaryMax,
+    string? SalaryCurrency,
+    string? RecruiterName,
+    string? RecruiterEmail,
+    string? RecruiterPhone,
+    string? RecruiterLinkedIn,
+    string? CompanyCareersUrl,
+    bool IsTestData,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt
 );

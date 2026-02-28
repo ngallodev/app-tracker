@@ -10,4 +10,9 @@ public record CreateResumeRequest
     
     [Required]
     public required string Content { get; init; }
+
+    public decimal? DesiredSalaryMin { get; init; }
+    public decimal? DesiredSalaryMax { get; init; }
+    public string? SalaryCurrency { get; init; }
+    public bool IsTestData { get; init; }
 }

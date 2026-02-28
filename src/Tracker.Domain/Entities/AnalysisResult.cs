@@ -12,6 +12,8 @@ public class AnalysisResult
     // Deterministic scores (0-100)
     public decimal CoverageScore { get; set; }
     public decimal GroundednessScore { get; set; }
+    public decimal SalaryAlignmentScore { get; set; }
+    public string? SalaryAlignmentNote { get; set; }
     
     // Navigation
     public Analysis Analysis { get; set; } = null!;

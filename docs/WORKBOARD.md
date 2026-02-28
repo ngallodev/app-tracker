@@ -14,6 +14,11 @@ Purpose: this is the canonical tracker for active architecture references, TODOs
 - [ ] Split single-page UI into dedicated routed pages for analysis and eval dashboards.
 - [ ] Complete reliability hardening for CLI-provider runtime path (timeouts/retry behavior and clearer failure telemetry).
 - [ ] Finish deployment track and publish a stable hosted environment.
+- [ ] Extend schema and UX for application lifecycle tracking (applied/interview/offer/rejection/events).
+- [ ] Add deterministic URL/file ingestion flow for jobs and resumes with bookmarklet-compatible payloads.
+- [ ] Add test-data lifecycle controls (`is_test_data` tagging + one-click cleanup endpoint).
+- [ ] Clarify analysis UI semantics (coverage/groundedness/salary alignment explanations and failure details).
+- [ ] Improve LM Studio success rate with chunked extraction for small context windows.
 
 ## Delivery Tickets
 
@@ -32,6 +37,18 @@ Definition of done: CLI provider execution has explicit timeout/retry policy, st
 4. `TICKET-004` Deployment Completion
 Status: open
 Definition of done: production deployment is documented, repeatable, and verified by smoke checks.
+
+5. `TICKET-005` Application Lifecycle Relational Model
+Status: in_progress
+Definition of done: relational `job_applications` and `job_application_events` tables exist with API/UI support for apply/update/close and timeline events.
+
+6. `TICKET-006` Ingestion + Test Data Ops
+Status: in_progress
+Definition of done: create-job supports URL-only import + upload/drop text ingestion, test data is tagged in DB, and `/api/dev/test-data` clears test records.
+
+7. `TICKET-007` Analysis UX + Provider Reliability
+Status: in_progress
+Definition of done: provider dropdown defaults to available provider, analysis error details are visible, metric meanings are explained, and LM Studio long-JD chunking is active.
 
 ## Archive Policy
 

@@ -11,6 +11,7 @@ using Tracker.AI.Cli;
 using Tracker.AI.Cli.Providers;
 using Tracker.AI.Services;
 using Tracker.Infrastructure.Data;
+using Tracker.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((context, services, configuration) =>
@@ -71,6 +72,7 @@ builder.Services.AddSingleton<OpenAiClient>(serviceProvider =>
 });
 builder.Services.AddSingleton<ILlmClient, HybridLlmClientRouter>();
 builder.Services.AddScoped<IAnalysisService, AnalysisService>();
+builder.Services.AddSingleton<JobIngestionService>();
 
 var app = builder.Build();
 
@@ -134,6 +136,12 @@ app.MapAnalysisEndpoints();
 
 // Eval endpoints
 app.MapEvalEndpoints();
+
+// Application tracking endpoints
+app.MapApplicationEndpoints();
+
+// Development helper endpoints
+app.MapDevEndpoints();
 
 // Auto-apply migrations on startup
 using (var scope = app.Services.CreateScope())

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using Tracker.AI;
 using Tracker.AI.Cli;
 using Tracker.AI.Services;
@@ -32,10 +33,14 @@ public static class AnalysesEndpoints
             analysis.JobId,
             analysis.ResumeId,
             analysis.Status.ToString(),
+            analysis.ErrorMessage,
+            analysis.ErrorCategory,
             gapMode,
             usedLlmFallback,
             analysis.Result?.CoverageScore ?? 0,
             analysis.Result?.GroundednessScore ?? 0,
+            analysis.Result?.SalaryAlignmentScore ?? 0,
+            analysis.Result?.SalaryAlignmentNote,
             analysis.Result?.RequiredSkillsJson,
             analysis.Result?.MissingRequiredJson,
             analysis.Result?.MissingPreferredJson,
@@ -45,6 +50,7 @@ public static class AnalysesEndpoints
             TokensPerSecond(analysis.InputTokens, analysis.OutputTokens, analysis.LatencyMs),
             ResolveProvider(analysis),
             ResolveExecutionMode(analysis),
+            analysis.IsTestData,
             analysis.CreatedAt
         );
     }
@@ -61,10 +67,14 @@ public static class AnalysesEndpoints
             analysis.JobId,
             analysis.ResumeId,
             analysis.Status.ToString(),
+            analysis.ErrorMessage,
+            analysis.ErrorCategory,
             gapMode,
             usedLlmFallback,
             analysis.Result?.CoverageScore ?? 0,
             analysis.Result?.GroundednessScore ?? 0,
+            analysis.Result?.SalaryAlignmentScore ?? 0,
+            analysis.Result?.SalaryAlignmentNote,
             analysis.Result?.RequiredSkillsJson,
             analysis.Result?.MissingRequiredJson,
             analysis.Result?.MissingPreferredJson,
@@ -74,8 +84,40 @@ public static class AnalysesEndpoints
             TokensPerSecond(analysis.InputTokens, analysis.OutputTokens, analysis.LatencyMs),
             provider,
             executionMode,
+            analysis.IsTestData,
             analysis.CreatedAt
         );
+    }
+
+    private static (decimal Score, string Note) ScoreSalaryAlignment(Job job, Resume resume)
+    {
+        if (job.SalaryMin is null && job.SalaryMax is null)
+        {
+            return (0m, "No salary range detected in job posting.");
+        }
+
+        if (resume.DesiredSalaryMin is null && resume.DesiredSalaryMax is null)
+        {
+            return (0m, "Resume has no salary preference set.");
+        }
+
+        var jobMin = job.SalaryMin ?? job.SalaryMax ?? 0m;
+        var jobMax = job.SalaryMax ?? job.SalaryMin ?? jobMin;
+        var desiredMin = resume.DesiredSalaryMin ?? resume.DesiredSalaryMax ?? 0m;
+        var desiredMax = resume.DesiredSalaryMax ?? resume.DesiredSalaryMin ?? desiredMin;
+
+        var overlaps = desiredMin <= jobMax && desiredMax >= jobMin;
+        if (overlaps)
+        {
+            return (100m, "Salary ranges overlap.");
+        }
+
+        if (desiredMin > jobMax)
+        {
+            return (25m, "Desired salary appears above posted range.");
+        }
+
+        return (40m, "Desired salary appears below posted range.");
     }
 
     private static (string gapMode, bool usedLlmFallback) ResolveGapAnalysisMode(Analysis analysis)
@@ -229,6 +271,43 @@ public static class AnalysesEndpoints
             return Results.Ok(result);
         })
         .WithName("GetAllAnalyses");
+
+        group.MapGet("/providers", (
+            IEnumerable<ICliProviderAdapter> adapters,
+            IOptionsMonitor<LlmCliOptions> options) =>
+        {
+            var byProvider = adapters.ToDictionary(a => a.ProviderName, StringComparer.OrdinalIgnoreCase);
+            var providers = LlmProviderCatalog.List()
+                .OrderBy(x => x)
+                .Select(name =>
+                {
+                    if (string.Equals(name, LlmProviderCatalog.Lmstudio, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new ProviderAvailabilityDto(
+                            name,
+                            true,
+                            "OpenAI-compatible LM Studio endpoint");
+                    }
+
+                    if (!byProvider.TryGetValue(name, out var adapter))
+                    {
+                        return new ProviderAvailabilityDto(name, false, "Adapter not registered");
+                    }
+
+                    var availability = adapter.GetAvailability();
+                    return new ProviderAvailabilityDto(name, availability.Available, availability.Message ?? string.Empty);
+                })
+                .ToList();
+
+            var configuredDefault = options.CurrentValue.DefaultProvider;
+            var preferredDefault = providers.FirstOrDefault(p =>
+                p.Available && string.Equals(p.Name, configuredDefault, StringComparison.OrdinalIgnoreCase));
+            var fallbackDefault = providers.FirstOrDefault(p => p.Available);
+            var defaultProvider = preferredDefault?.Name ?? fallbackDefault?.Name ?? configuredDefault;
+
+            return Results.Ok(new AnalysisProvidersDto(defaultProvider, providers));
+        })
+        .WithName("GetAnalysisProviders");
 
         // GET /api/analyses/metrics
         group.MapGet("/metrics", async (TrackerDbContext db, CancellationToken ct) =>
@@ -507,6 +586,7 @@ public static class AnalysesEndpoints
                 JobId = request.JobId,
                 ResumeId = request.ResumeId,
                 Status = AnalysisStatus.Running,
+                IsTestData = request.IsTestData ?? job.IsTestData || resume.IsTestData,
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
@@ -528,6 +608,9 @@ public static class AnalysesEndpoints
                 analysis.InputTokens = result.Metadata.TotalInputTokens;
                 analysis.OutputTokens = result.Metadata.TotalOutputTokens;
                 analysis.LatencyMs = result.Metadata.TotalLatencyMs;
+                analysis.ErrorMessage = null;
+                analysis.ErrorCategory = null;
+                var (salaryScore, salaryNote) = ScoreSalaryAlignment(job, resume);
 
                 // Store result
                 var analysisResult = new AnalysisResult
@@ -535,6 +618,8 @@ public static class AnalysesEndpoints
                     AnalysisId = analysis.Id,
                     CoverageScore = result.Scores.CoverageScore,
                     GroundednessScore = result.Scores.GroundednessScore,
+                    SalaryAlignmentScore = salaryScore,
+                    SalaryAlignmentNote = salaryNote,
                     RequiredSkillsJson = JsonSerializer.Serialize(result.JdExtraction.RequiredSkills),
                     MissingRequiredJson = JsonSerializer.Serialize(result.GapAnalysis.MissingRequired),
                     MissingPreferredJson = JsonSerializer.Serialize(result.GapAnalysis.MissingPreferred)
@@ -674,6 +759,7 @@ public static class AnalysesEndpoints
                 requestStopwatch.Stop();
                 analysis.Status = AnalysisStatus.Failed;
                 analysis.ErrorMessage = llmEx.Message;
+                analysis.ErrorCategory = llmEx.ErrorCode ?? "llm";
                 db.AnalysisRequestMetrics.Add(CreateRequestMetric(
                     request.JobId,
                     request.ResumeId,
@@ -706,6 +792,7 @@ public static class AnalysesEndpoints
                 requestStopwatch.Stop();
                 analysis.Status = AnalysisStatus.Failed;
                 analysis.ErrorMessage = ex.Message;
+                analysis.ErrorCategory = "unhandled";
                 db.AnalysisRequestMetrics.Add(CreateRequestMetric(
                     request.JobId,
                     request.ResumeId,

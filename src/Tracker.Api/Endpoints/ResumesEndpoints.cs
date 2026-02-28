@@ -11,6 +11,18 @@ public static class ResumesEndpoints
 {
     private static string? GetContentPreview(string content) =>
         content.Length > 200 ? content.Substring(0, 200) + "..." : content;
+
+    private static ResumeDto ToDto(Resume resume, bool fullContent = false) => new(
+        resume.Id,
+        resume.Name,
+        fullContent ? resume.Content : GetContentPreview(resume.Content),
+        resume.DesiredSalaryMin,
+        resume.DesiredSalaryMax,
+        resume.SalaryCurrency,
+        resume.IsTestData,
+        resume.CreatedAt,
+        resume.UpdatedAt
+    );
     
     public static IEndpointRouteBuilder MapResumeEndpoints(this IEndpointRouteBuilder app)
     {
@@ -26,13 +38,7 @@ public static class ResumesEndpoints
             
             var result = resumes
                 .OrderByDescending(r => r.CreatedAt)
-                .Select(r => new ResumeDto(
-                    r.Id,
-                    r.Name,
-                    GetContentPreview(r.Content),
-                    r.CreatedAt,
-                    r.UpdatedAt
-                ))
+                .Select(r => ToDto(r))
                 .ToList();
             return Results.Ok(result);
         })
@@ -45,13 +51,7 @@ public static class ResumesEndpoints
             if (resume is null)
                 return Results.NotFound();
             
-            return Results.Ok(new ResumeDto(
-                resume.Id,
-                resume.Name,
-                resume.Content, // Return full content for individual fetch
-                resume.CreatedAt,
-                resume.UpdatedAt
-            ));
+            return Results.Ok(ToDto(resume, fullContent: true));
         })
         .WithName("GetResumeById");
         
@@ -64,6 +64,10 @@ public static class ResumesEndpoints
                 Name = request.Name,
                 Content = request.Content,
                 ContentHash = HashUtility.ComputeNormalizedHash(request.Content),
+                DesiredSalaryMin = request.DesiredSalaryMin,
+                DesiredSalaryMax = request.DesiredSalaryMax,
+                SalaryCurrency = request.SalaryCurrency,
+                IsTestData = request.IsTestData,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             };
@@ -71,13 +75,7 @@ public static class ResumesEndpoints
             db.Resumes.Add(resume);
             await db.SaveChangesAsync(ct);
             
-            return Results.Created($"/api/resumes/{resume.Id}", new ResumeDto(
-                resume.Id,
-                resume.Name,
-                GetContentPreview(resume.Content),
-                resume.CreatedAt,
-                resume.UpdatedAt
-            ));
+            return Results.Created($"/api/resumes/{resume.Id}", ToDto(resume));
         })
         .WithName("CreateResume");
         
@@ -95,18 +93,20 @@ public static class ResumesEndpoints
                 resume.Content = request.Content;
                 resume.ContentHash = HashUtility.ComputeNormalizedHash(request.Content);
             }
+            if (request.DesiredSalaryMin.HasValue)
+                resume.DesiredSalaryMin = request.DesiredSalaryMin.Value;
+            if (request.DesiredSalaryMax.HasValue)
+                resume.DesiredSalaryMax = request.DesiredSalaryMax.Value;
+            if (request.SalaryCurrency is not null)
+                resume.SalaryCurrency = request.SalaryCurrency;
+            if (request.IsTestData.HasValue)
+                resume.IsTestData = request.IsTestData.Value;
             
             resume.UpdatedAt = DateTimeOffset.UtcNow;
             
             await db.SaveChangesAsync(ct);
             
-            return Results.Ok(new ResumeDto(
-                resume.Id,
-                resume.Name,
-                GetContentPreview(resume.Content),
-                resume.CreatedAt,
-                resume.UpdatedAt
-            ));
+            return Results.Ok(ToDto(resume));
         })
         .WithName("UpdateResume");
         

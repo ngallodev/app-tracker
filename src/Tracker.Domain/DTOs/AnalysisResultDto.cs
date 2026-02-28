@@ -5,10 +5,14 @@ public record AnalysisResultDto(
     Guid JobId,
     Guid ResumeId,
     string Status,
+    string? ErrorMessage,
+    string? ErrorCategory,
     string GapAnalysisMode,
     bool UsedGapLlmFallback,
     decimal CoverageScore,
     decimal GroundednessScore,
+    decimal SalaryAlignmentScore,
+    string? SalaryAlignmentNote,
     string? RequiredSkillsJson,
     string? MissingRequiredJson,
     string? MissingPreferredJson,
@@ -18,6 +22,7 @@ public record AnalysisResultDto(
     decimal TokensPerSecond,
     string Provider,
     string ExecutionMode,
+    bool IsTestData,
     DateTimeOffset CreatedAt
 );
 

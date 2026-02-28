@@ -23,6 +23,8 @@ public class Analysis
     
     // Error tracking
     public string? ErrorMessage { get; set; }
+    public string? ErrorCategory { get; set; }
+    public bool IsTestData { get; set; }
     
     // Navigation properties
     public Job Job { get; set; } = null!;

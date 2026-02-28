@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Tracker.AI.Cli;
 using Tracker.AI.Models;
 using Tracker.AI.Prompts;
@@ -71,11 +72,17 @@ public class AnalysisService : IAnalysisService
 {
     private readonly ILlmClient _llmClient;
     private readonly ILogger<AnalysisService> _logger;
+    private readonly IOptionsMonitor<LlmCliOptions> _options;
+    private const int LmStudioChunkTargetChars = 2200;
 
-    public AnalysisService(ILlmClient llmClient, ILogger<AnalysisService> logger)
+    public AnalysisService(
+        ILlmClient llmClient,
+        ILogger<AnalysisService> logger,
+        IOptionsMonitor<LlmCliOptions> options)
     {
         _llmClient = llmClient;
         _logger = logger;
+        _options = options;
     }
 
     public async Task<AnalysisPipelineResult> AnalyzeAsync(
@@ -88,14 +95,11 @@ public class AnalysisService : IAnalysisService
         var totalInputTokens = 0;
         var totalOutputTokens = 0;
         var model = string.Empty;
+        var resolvedProvider = LlmProviderCatalog.NormalizeOrThrow(providerOverride ?? _options.CurrentValue.DefaultProvider);
         
         // Step 1: Extract JD structure
         _logger.LogInformation("Starting JD extraction");
-        var jdResult = await _llmClient.CompleteStructuredAsync<JdExtraction>(
-            JdExtractionPrompt.SystemPrompt,
-            JdExtractionPrompt.UserPrompt(jobDescription),
-            providerOverride,
-            cancellationToken);
+        var jdResult = await ExtractJdAsync(jobDescription, providerOverride, resolvedProvider, cancellationToken);
         
         totalInputTokens += jdResult.Usage.InputTokens;
         totalOutputTokens += jdResult.Usage.OutputTokens;
@@ -196,6 +200,158 @@ public class AnalysisService : IAnalysisService
                 GapAnalysisMode = gapAnalysisMode,
                 UsedGapLlmFallback = usedGapLlmFallback
             }
+        };
+    }
+
+    private async Task<LlmResult<JdExtraction>> ExtractJdAsync(
+        string jobDescription,
+        string? providerOverride,
+        string resolvedProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(resolvedProvider, LlmProviderCatalog.Lmstudio, StringComparison.OrdinalIgnoreCase) ||
+            jobDescription.Length <= LmStudioChunkTargetChars)
+        {
+            return await _llmClient.CompleteStructuredAsync<JdExtraction>(
+                JdExtractionPrompt.SystemPrompt,
+                JdExtractionPrompt.UserPrompt(jobDescription),
+                providerOverride,
+                cancellationToken);
+        }
+
+        var chunks = ChunkByLength(jobDescription, LmStudioChunkTargetChars);
+        _logger.LogInformation("LM Studio chunking enabled for JD extraction. ChunkCount={ChunkCount}", chunks.Count);
+        var partials = new List<JdExtraction>(chunks.Count);
+        var totalIn = 0;
+        var totalOut = 0;
+        var totalLatency = 0;
+        var anyRepair = false;
+        var allParseSuccess = true;
+        var rawResponses = new List<string>();
+        var model = string.Empty;
+
+        foreach (var chunk in chunks)
+        {
+            var result = await _llmClient.CompleteStructuredAsync<JdExtraction>(
+                JdExtractionPrompt.SystemPrompt,
+                JdExtractionPrompt.UserPrompt(chunk),
+                providerOverride,
+                cancellationToken);
+            partials.Add(result.Value);
+            totalIn += result.Usage.InputTokens;
+            totalOut += result.Usage.OutputTokens;
+            totalLatency += result.LatencyMs;
+            anyRepair |= result.RepairAttempted;
+            allParseSuccess &= result.ParseSuccess;
+            model = result.Model;
+            if (!string.IsNullOrWhiteSpace(result.RawResponse))
+            {
+                rawResponses.Add(result.RawResponse);
+            }
+        }
+
+        var merged = MergeExtractions(partials);
+        return new LlmResult<JdExtraction>
+        {
+            Value = merged,
+            Usage = new LlmUsage { InputTokens = totalIn, OutputTokens = totalOut },
+            Provider = resolvedProvider,
+            Model = model,
+            LatencyMs = totalLatency,
+            ParseSuccess = allParseSuccess,
+            RepairAttempted = anyRepair,
+            RawResponse = string.Join("\n\n---chunk---\n\n", rawResponses)
+        };
+    }
+
+    private static List<string> ChunkByLength(string input, int maxChars)
+    {
+        var chunks = new List<string>();
+        var start = 0;
+        while (start < input.Length)
+        {
+            var remaining = input.Length - start;
+            if (remaining <= maxChars)
+            {
+                chunks.Add(input[start..].Trim());
+                break;
+            }
+
+            var candidateEnd = start + maxChars;
+            var breakIndex = input.LastIndexOf('\n', candidateEnd, maxChars);
+            if (breakIndex <= start)
+            {
+                breakIndex = input.LastIndexOf(' ', candidateEnd, maxChars);
+            }
+
+            if (breakIndex <= start)
+            {
+                breakIndex = candidateEnd;
+            }
+
+            chunks.Add(input[start..breakIndex].Trim());
+            start = breakIndex;
+        }
+
+        return chunks.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+    }
+
+    private static JdExtraction MergeExtractions(List<JdExtraction> parts)
+    {
+        var first = parts.FirstOrDefault() ?? new JdExtraction
+        {
+            RoleTitle = "Unknown Role",
+            SeniorityLevel = null,
+            YearsExperience = null
+        };
+
+        var requiredByName = new Dictionary<string, SkillWithEvidence>(StringComparer.OrdinalIgnoreCase);
+        var preferredByName = new Dictionary<string, SkillWithEvidence>(StringComparer.OrdinalIgnoreCase);
+        var responsibilities = new List<ResponsibilityWithEvidence>();
+        var keywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var part in parts)
+        {
+            foreach (var skill in part.RequiredSkills)
+            {
+                if (!requiredByName.ContainsKey(skill.SkillName))
+                {
+                    requiredByName[skill.SkillName] = skill;
+                }
+            }
+
+            foreach (var skill in part.PreferredSkills)
+            {
+                if (!preferredByName.ContainsKey(skill.SkillName) &&
+                    !requiredByName.ContainsKey(skill.SkillName))
+                {
+                    preferredByName[skill.SkillName] = skill;
+                }
+            }
+
+            foreach (var responsibility in part.Responsibilities)
+            {
+                if (!responsibilities.Any(r => r.Description.Equals(responsibility.Description, StringComparison.OrdinalIgnoreCase)))
+                {
+                    responsibilities.Add(responsibility);
+                }
+            }
+
+            foreach (var keyword in part.Keywords)
+            {
+                keywords.Add(keyword);
+            }
+        }
+
+        return new JdExtraction
+        {
+            RoleTitle = first.RoleTitle,
+            SeniorityLevel = parts.Select(p => p.SeniorityLevel).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)),
+            RequiredSkills = requiredByName.Values.ToList(),
+            PreferredSkills = preferredByName.Values.ToList(),
+            Responsibilities = responsibilities,
+            YearsExperience = parts.Select(p => p.YearsExperience).FirstOrDefault(v => !string.IsNullOrWhiteSpace(v)),
+            Keywords = keywords.ToList()
         };
     }
 

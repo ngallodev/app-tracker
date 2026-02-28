@@ -11,4 +11,5 @@ public record CreateAnalysisRequest
     public required Guid ResumeId { get; init; }
 
     public string? Provider { get; init; }
+    public bool? IsTestData { get; init; }
 }
