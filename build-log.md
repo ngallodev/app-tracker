@@ -160,3 +160,50 @@ Signed-off-by: codex gpt-5
 - .NET SDK 10.0.103 exhibited intermittent parallel-build behavior for `Tracker.Eval` in CI context; single-node prebuild (`-m:1`) produced stable execution.
 
 Signed-off-by: codex gpt-5
+
+---
+
+## Entry 6 — 2026-02-27 — codex gpt-5
+
+**Branch:** chore/deterministic-eval-and-doc-archive
+**Commit scope:** Normalize app-tracker review agent/skill architecture with templated contracts, extracted scripts/assets, and single-copy symlink strategy
+
+### Changes
+- Added `.claude/agents/app-tracker-review-agent.md` as the canonical templated orchestrator agent.
+- Updated `.claude/agents/app-tracker-review.md` to a back-compat alias (no duplicated workflow logic).
+- Refactored `.codex/skills/app-tracker-drift-review/SKILL.md` to a variable-driven contract (no hardcoded repo paths).
+- Added `.codex/skills/app-tracker-drift-review/scripts/run_drift_checks.sh` and moved executable checks out of markdown.
+- Added `.codex/skills/app-tracker-drift-review/assets/findings-template.md` for report structure.
+- Added `.claude/skills -> ../.codex/skills` symlink so skills exist in one canonical location and are referenced from both trees.
+
+### Build Notes
+- Executed extracted skill script with explicit variable inputs:
+  - `REPO_ROOT=/lump/apps/app-tracker API_PROJECT=src/Tracker.Api/Tracker.Api.csproj WEB_DIR=web API_HOST=127.0.0.1 API_PORT=5278 INCLUDE_RUNTIME_SMOKE=false .codex/skills/app-tracker-drift-review/scripts/run_drift_checks.sh`
+- Verification results:
+  - `dotnet build src/Tracker.Api/Tracker.Api.csproj` succeeded
+  - `npm run build --prefix web` succeeded
+
+### Issues Encountered
+- None; refactor completed as structural/documentation normalization.
+
+Signed-off-by: codex gpt-5
+
+---
+
+## Entry 7 — 2026-02-27 — codex gpt-5
+
+**Branch:** chore/deterministic-eval-and-doc-archive
+**Commit scope:** Stop tracking generated frontend dist artifacts
+
+### Changes
+- `.gitignore`: added `web/dist/` so frontend build outputs are ignored.
+- Removed tracked `web/dist` artifacts from git index (kept locally on disk).
+
+### Build Notes
+- No rebuild required for this change; it is repository hygiene only.
+- Verified ignore behavior with `git check-ignore` against `web/dist/index.html`.
+
+### Issues Encountered
+- None.
+
+Signed-off-by: codex gpt-5

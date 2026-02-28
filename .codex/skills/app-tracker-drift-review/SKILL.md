@@ -1,43 +1,54 @@
---- 
+---
 name: app-tracker-drift-review
-description: Use this skill when reviewing the repo state, plan drift, and what is actually runnable.
+description: Variable-driven skill for plan-vs-implementation drift review with deterministic checks and findings-first output.
 ---
 
-## Goal
-- Produce a critical, findings-first review of `docs/PLAN.md` vs implementation.
-- Separate code defects/drift from environment/tooling constraints.
+## Input Contract
+Caller passes variables (no hardcoded repo paths in this skill):
+- `repo_root`
+- `plan_doc`
+- `readme_doc`
+- `api_project`
+- `web_dir`
+- `api_host`
+- `api_port`
 
-## Minimal Workflow
-1. Read:
-- `docs/PLAN.md`
-- `README.md`
-- `src/Tracker.Api/Program.cs`
-- `src/Tracker.Api/Endpoints/*.cs`
-- `src/Tracker.AI/Services/AnalysisService.cs`
-- `web/src/App.tsx`
-- `src/Tracker.Eval/Program.cs`
-2. Verify:
-- `git status --short`
-- `DOTNET_CLI_HOME=/tmp NUGET_PACKAGES=/tmp/.nuget dotnet build src/Tracker.Api/Tracker.Api.csproj`
-- `npm run build --prefix web` (if dependencies are present)
-3. Optional runtime smoke:
-- `DOTNET_CLI_HOME=/tmp NUGET_PACKAGES=/tmp/.nuget HOST=127.0.0.1 PORT=5278 ./scripts/run_api.sh`
-- `curl /healthz`, `/healthz/deps`, `/version`
-4. Report sections:
-- Findings (severity first)
+Optional:
+- `api_program_file`
+- `api_endpoints_glob`
+- `analysis_service_file`
+- `eval_program_file`
+- `web_app_file`
+- `include_runtime_smoke` (`true`/`false`)
+
+## Resolved Paths
+Treat variables as authoritative. Resolve all relative paths from `${repo_root}`.
+
+## Workflow
+1. Read planning + implementation docs:
+- `${plan_doc}`
+- `${readme_doc}`
+2. Read implementation surfaces:
+- `${api_program_file}`
+- files matching `${api_endpoints_glob}`
+- `${analysis_service_file}`
+- `${eval_program_file}`
+- `${web_app_file}`
+3. Execute deterministic checks via:
+- `scripts/run_drift_checks.sh`
+4. If `include_runtime_smoke=true`, run smoke checks from the script output guidance.
+5. Produce report using `assets/findings-template.md`.
+
+## Required Output
+- Findings (severity-ordered, file references first)
 - Working / Not Working
-- Plan Drift
+- Plan Drift (planned-missing, implemented-undocumented, stale-docs)
 - Recommended implementation order
+- Exact verification commands executed
 
-## app-tracker Notes
-- Frontend is currently minimal/read-only; do not assume Day 3 UI is complete.
-- CLI-provider runtime may differ from the OpenAI-centric plan text.
-- `Tracker.Eval` may be blocked by offline NuGet in sandboxed environments.
+## Notes
+- Keep skill generic and variable-driven.
+- Do not duplicate script logic inside this markdown.
+- Distinguish environment constraints from code defects.
 
-## Output Style
-- Concise, implementation-first.
-- Always include file references.
-- Call out exact commands used for verification.
-
-Signed
-- codex gpt-5
+Maintainer: codex gpt-5
