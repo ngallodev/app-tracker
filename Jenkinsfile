@@ -1,6 +1,10 @@
 pipeline {
   agent any
-
+  parameters {
+    string(name: 'GIT_SHA', defaultValue: '', description: 'Commit SHA to build')
+    string(name: 'REPO_PATH', defaultValue: '', description: 'Local repo path that contains the commit')
+    string(name: 'BRANCH_NAME', defaultValue: '', description: 'Branch name (informational)')
+  }
   options {
     timestamps()
     disableConcurrentBuilds()
@@ -13,6 +17,17 @@ pipeline {
   }
 
   stages {
+    stage('Checkout') {
+      steps {
+        sh '''
+          set -e
+          rm -rf src
+          git clone "${REPO_PATH}" src
+          cd src
+          git checkout "${GIT_SHA}"
+        '''
+      }
+    }
     stage('Prep') {
       steps {
         sh 'mkdir -p "${ARTIFACT_DIR}" "${ARTIFACT_DIR}/logs"'
