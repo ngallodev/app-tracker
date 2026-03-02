@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Specify the path to your .env file
+ENV_FILE="../../.env"
+
+# Check if the file exists before sourcing
+if [ -f "$ENV_FILE" ]; then
+    source "$ENV_FILE"
+    echo "Loaded environment variables from $ENV_FILE"
+else
+    echo "Error: $ENV_FILE file not found."
+    exit 1
+fi
+
+
+JENKINS_URL="${JENKINS_URL:-http://localhost:8080}"
+JOB_NAME="tracker-pipe"
+JENKINS_USER="${JENKINS_USER:?Set JENKINS_USER in your local environment}"
+JENKINS_API_TOKEN="${JENKINS_API_TOKEN:?Set JENKINS_API_TOKEN in your local environment}"
+# JENKINS_BUILD_TOKEN="${JENKINS_BUILD_TOKEN:?Set JENKINS_BUILD_TOKEN in your local environment}"
+JENKINS_BUILD_TOKEN_NAME="${JENKINS_BUILD_TOKEN_NAME:?Set JENKINS_BUILD_TOKEN_NAME in this repos .env file}"
+
+# Optional: pass a Jenkins credential ID so the pipeline can resolve a secret string.
+API_KEY_CREDENTIAL_ID="${API_KEY_CREDENTIAL_ID:-}"
+API_KEY_ENV_VAR="${API_KEY_ENV_VAR:-APP_TRACKER_API_KEY}"
+
+SHA="$(git rev-parse HEAD)"
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+REPO_PATH="$(pwd)"
+
+ # --data-urlencode "token=${JENKINS_BUILD_TOKEN_NAME}"
+params=(
+  --data-urlencode "GIT_SHA=${SHA}"
+  --data-urlencode "BRANCH_NAME=${BRANCH}"
+  --data-urlencode "REPO_PATH=${REPO_PATH}"
+)
+if [[ -n "${API_KEY_CREDENTIAL_ID}" ]]; then
+  params+=(--data-urlencode "API_KEY_CREDENTIAL_ID=${API_KEY_CREDENTIAL_ID}")
+  params+=(--data-urlencode "API_KEY_ENV_VAR=${API_KEY_ENV_VAR}")
+fi
+
+# Trigger Jenkins to build *this exact commit*
+curl -L \
+  --user "${JENKINS_USER}:${JENKINS_API_TOKEN}" -fsS -X POST \
+  "${JENKINS_URL}/job/${JOB_NAME}/buildWithParameters" \
+  "${params[@]}" 
+
+if [[ -n "${API_KEY_CREDENTIAL_ID}" ]]; then
+  echo "Triggered Jenkins for ${BRANCH}@${SHA:0:8} with credential id ${API_KEY_CREDENTIAL_ID}"
+else
+  echo "Triggered Jenkins for ${BRANCH}@${SHA:0:8}"
+fi
