@@ -45,6 +45,9 @@ artifacts/
 .dev-report-cache.md
 .dev-report-cahe.md
 
+# archived/ignored docs
+ignore*/*
+
 # OS files
 .DS_Store
 Thumbs.db

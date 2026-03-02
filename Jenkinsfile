@@ -1,9 +1,26 @@
+def runWithOptionalApiKey(String cmd, String credentialId, String envVarName) {
+  if (credentialId?.trim()) {
+    withCredentials([string(credentialsId: credentialId.trim(), variable: 'INJECTED_API_KEY')]) {
+      sh """#!/usr/bin/env bash
+set -euo pipefail
+set +x
+export ${envVarName}="\${INJECTED_API_KEY}"
+${cmd}
+"""
+    }
+  } else {
+    sh cmd
+  }
+}
+
 pipeline {
   agent any
   parameters {
     string(name: 'GIT_SHA', defaultValue: '', description: 'Commit SHA to build')
     string(name: 'REPO_PATH', defaultValue: '', description: 'Local repo path that contains the commit')
     string(name: 'BRANCH_NAME', defaultValue: '', description: 'Branch name (informational)')
+    string(name: 'API_KEY_CREDENTIAL_ID', defaultValue: '', description: 'Optional Jenkins secret text credential ID to inject at runtime')
+    string(name: 'API_KEY_ENV_VAR', defaultValue: 'APP_TRACKER_API_KEY', description: 'Environment variable name for injected API key')
   }
   options {
     timestamps()
@@ -36,31 +53,61 @@ pipeline {
 
     stage('Restore') {
       steps {
-        sh './scripts/ci_stage.sh restore dotnet restore Tracker.slnx'
+        script {
+          runWithOptionalApiKey(
+            './scripts/ci_stage.sh restore dotnet restore Tracker.slnx',
+            params.API_KEY_CREDENTIAL_ID,
+            params.API_KEY_ENV_VAR ?: 'APP_TRACKER_API_KEY'
+          )
+        }
       }
     }
 
     stage('Build') {
       steps {
-        sh './scripts/ci_stage.sh build dotnet build Tracker.slnx -v minimal'
+        script {
+          runWithOptionalApiKey(
+            './scripts/ci_stage.sh build dotnet build Tracker.slnx -v minimal',
+            params.API_KEY_CREDENTIAL_ID,
+            params.API_KEY_ENV_VAR ?: 'APP_TRACKER_API_KEY'
+          )
+        }
       }
     }
 
     stage('Tests') {
       steps {
-        sh './scripts/ci_stage.sh tests dotnet test Tracker.slnx -v minimal'
+        script {
+          runWithOptionalApiKey(
+            './scripts/ci_stage.sh tests dotnet test Tracker.slnx -v minimal',
+            params.API_KEY_CREDENTIAL_ID,
+            params.API_KEY_ENV_VAR ?: 'APP_TRACKER_API_KEY'
+          )
+        }
       }
     }
 
     stage('Deterministic Eval') {
       steps {
-        sh './scripts/ci_stage.sh deterministic_eval ./scripts/run_deterministic_eval.sh'
+        script {
+          runWithOptionalApiKey(
+            './scripts/ci_stage.sh deterministic_eval ./scripts/run_deterministic_eval.sh',
+            params.API_KEY_CREDENTIAL_ID,
+            params.API_KEY_ENV_VAR ?: 'APP_TRACKER_API_KEY'
+          )
+        }
       }
     }
 
     stage('Proof Of Life') {
       steps {
-        sh 'SKIP_ANALYSIS=1 ./scripts/ci_stage.sh proof_of_life ./scripts/proof_of_life.sh'
+        script {
+          runWithOptionalApiKey(
+            'SKIP_ANALYSIS=1 ./scripts/ci_stage.sh proof_of_life ./scripts/proof_of_life.sh',
+            params.API_KEY_CREDENTIAL_ID,
+            params.API_KEY_ENV_VAR ?: 'APP_TRACKER_API_KEY'
+          )
+        }
       }
     }
   }
