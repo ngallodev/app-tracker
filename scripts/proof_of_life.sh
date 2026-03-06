@@ -196,3 +196,36 @@ if [[ "${ui_status}" != "200" || "${health_status}" != "200" || "${analyses_list
   echo "Critical proof-of-life checks failed." >&2
   exit 1
 fi
+
+# • Summary The script boots the local backend (scripts/run_api.sh) and
+#   frontend (npm run dev), each on a dynamically chosen port (default
+#   5278/5173, but it scans for the next free port). It logs to
+#   artifacts/logs/proof_of_life.log, traps SIG/EXIT to clean up, and
+#   enforces set -euo pipefail.
+
+#   Health areas checked
+
+#   - UI accessibility: waits for ${UI_URL}/ to respond (exits non-zero
+#     on timeout) and records its HTTP status code.
+#   - API readiness: waits for ${API_URL}/healthz and records its status.
+#   - Endpoint coverage: polls ${API_URL}/api/analyses to confirm the
+#     analyses listing is reachable.
+
+#   Beyond the simple probes, it validates core functionality by posting
+#   a dummy job and resume, optionally POSTing an analysis
+#   (ANALYSIS_PROVIDER configurable, skipped if SKIP_ANALYSIS=1), and
+#   calling ${API_URL}/eval/run. The script captures each response body/
+#   status into the summary JSON along with the job/resume IDs, plus
+#   saves ${API_URL}/api/analyses/metrics results to ${ARTIFACT_DIR}/
+#   analysis-metrics.json. If any of the three critical status codes
+#   (uiStatus, apiHealthStatus, analysesListStatus) are not 200, it
+#   prints an error and exits with failure.
+
+#   Artifacts produced
+
+#   1. artifacts/logs/proof_of_life.log – combined stdout/stderr from API
+#      and frontend.
+#   2. artifacts/proof-of-life-summary.json – overall report with UI/API
+#      statuses, responses from analysis/eval, and job/resume IDs.
+#   3. artifacts/analysis-metrics.json – metrics payload fetched from
+#      the /api/analyses/metrics endpoint.
